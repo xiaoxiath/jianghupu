@@ -1,0 +1,51 @@
+[
+  {
+    "id": "e001",
+    "type": "机缘",
+    "title": "悬崖奇遇",
+    "description": "你在山野间失足，坠落悬崖。",
+    "trigger": "state.player.stats.hp < state.player.stats.maxHp * 0.2 && state.world.locations.get(state.world.currentLocationId)?.type === '山野'"
+  },
+  {
+    "id": "e002",
+    "type": "战斗",
+    "title": "遭遇劫匪",
+    "description": "你走在路上，突然跳出一伙面目狰狞的劫匪。",
+    "trigger": "getRandomInt(0, 100) < 10"
+  },
+  {
+    "id": "e003",
+    "type": "社交",
+    "title": "酒馆闲谈",
+    "description": "你在酒馆里坐下，邻桌的谈话引起了你的注意。",
+    "trigger": "state.world.locations.get(state.world.currentLocationId)?.name.includes('酒馆')"
+  },
+  {
+    "id": "war_reporter",
+    "type": "社交",
+    "title": "战地风云",
+    "description": "你途经一个村庄，发现两个门派的弟子正在激烈交战，村民们四散奔逃。",
+    "trigger": "isFactionWarHappening()"
+  },
+  {
+    "id": "e004_ancient_scroll",
+    "type": "机缘",
+    "title": "古旧的秘籍",
+    "description": "在一个不起眼的角落（例如旧书摊、山洞深处），你发现一本满是灰尘的古旧秘籍。",
+    "trigger": "(state.world.locations.get(state.world.currentLocationId)?.name.includes('书院') || state.world.locations.get(state.world.currentLocationId)?.type === '山洞') && getRandomInt(0, 100) < 5"
+  },
+  {
+    "id": "e005_sect_trial",
+    "type": "社交",
+    "title": "门派的考验",
+    "description": "一位身着门派服饰的弟子拦住了你的去路，似乎想要掂量你的斤两。",
+    "trigger": "state.player.reputation > 100 && getRandomInt(0, 100) < 15"
+  },
+  {
+    "id": "e006_market_rumor",
+    "type": "社交",
+    "title": "市井流言",
+    "description": "你在市集闲逛时，无意中听到旁边的人在低声议论着近期的江湖传闻。",
+    "trigger": "state.world.locations.get(state.world.currentLocationId)?.type === '城镇' && getRandomInt(0, 100) < 20"
+  }
+]

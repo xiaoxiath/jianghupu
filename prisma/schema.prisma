@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 用于记录 NPC 的核心数据，会随游戏进程更新
+model NPC {
+  id         Int     @id @default(autoincrement())
+  name       String  @unique
+  sect       String?
+  realm      String
+  alive      Boolean @default(true)
+  location   String
+  reputation Int     @default(0)
+
+  // 可以添加更多字段来追踪 NPC 的生平
+  // 例如：出生日期、死亡日期、主要成就等
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 用于记录世界的重大事件，形成历史
+model EventLog {
+  id        Int      @id @default(autoincrement())
+  timestamp String // 游戏内时间，例如 "甲子年春"
+  type      String // 事件类型，如 WAR_START, NPC_DEATH, NEW_ERA
+  details   String // 事件详情的 JSON 字符串
+
+  createdAt DateTime @default(now())
+}
+
+// 门派/势力
+model Faction {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  alignment   String // 正道, 邪宗, 中立
+  reputation  Int      @default(0)
+  leaderId    Int?     // 掌门人 NPC ID
+  description String?
+
+  // 关系: 一个门派作为 source 或 target 参与多个关系
+  relationshipsAsSource   FactionRelationship[] @relation("SourceFaction")
+  relationshipsAsTarget   FactionRelationship[] @relation("TargetFaction")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 门派关系
+model FactionRelationship {
+  id        Int      @id @default(autoincrement())
+  sourceId  Int
+  targetId  Int
+  status    String // ALLIED, HOSTILE, NEUTRAL
+  intensity Int      @default(0) // 关系强度
+
+  source    Faction @relation("SourceFaction", fields: [sourceId], references: [id])
+  target    Faction @relation("TargetFaction", fields: [targetId], references: [id])
+
+  @@unique([sourceId, targetId]) // 确保任意两个门派之间只有一种关系
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 武学
+model MartialArt {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  type        String // 外功, 内功, 轻功, 心法, 暗器
+  description String
+  power       Int      @default(0) // 基础威力
+  requirement String?  // 学习条件, e.g., "intelligence > 20"
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 物品
+model Item {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  type        String // 丹药, 装备, 杂物, 秘籍
+  description String
+  effect      String?  // 物品效果, e.g., "hp +50" or "strength +1"
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

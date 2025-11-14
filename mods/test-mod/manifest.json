@@ -1,0 +1,8 @@
+{
+  "id": "test-mod",
+  "name": "Test Mod",
+  "author": "Roo",
+  "version": "1.0.0",
+  "description": "A simple mod to test the mod loader.",
+  "loadPriority": 100
+}
