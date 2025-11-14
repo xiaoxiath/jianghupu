@@ -34,6 +34,7 @@ export interface PlayerState {
   stats: PlayerStats;
   realm: PlayerRealm;
   alignment: '正' | '邪' | '中立';
+  triggeredOnceEvents: string[]; // 已经触发过的 once 事件 ID
 }
 
 /**
@@ -60,5 +61,6 @@ export function createInitialPlayer(name: string): PlayerState {
     },
     realm: '凡人',
     alignment: '中立',
+    triggeredOnceEvents: [],
   };
 }

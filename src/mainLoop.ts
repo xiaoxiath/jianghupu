@@ -3,7 +3,7 @@ import { cli } from './ui/cli.js';
 import { gameState } from './core/state.js';
 import { handleCommand, sceneNeedsUpdate } from './ui/commands.js';
 import { sceneManager } from './narrator/sceneManager.js';
-import { triggerRandomEvent } from './core/eventEngine.js';
+import { triggerRandomEvent, triggerDynamicEvent, type EventChoice } from './core/eventEngine.js';
 import { startCombat } from './systems/combat.js';
 import { createBandit } from './core/npc.js';
 import { handleLegacy } from './systems/legacy.js';
@@ -29,17 +29,27 @@ export async function mainLoop() {
   let nextSceneSummary = '游戏开始，你发现自己站在一个未知的江湖世界中。';
   let lastPlayerChoice = '';
 
+  let loopCount = 0;
   while (true) {
+    loopCount++;
     console.log('\n' + '---'.repeat(20));
 
     // 1. 活态世界演化
     updateNpcEngine();
-    evolveFactions();
+    const factionContext = await evolveFactions();
 
-    // 2. 检查是否触发随机事件
-    const event = await triggerRandomEvent();
+    // 2. 检查事件队列或触发随机事件
+    let event = null;
+    if (gameState.eventQueue.length > 0) {
+      event = gameState.eventQueue.shift()!;
+    } else {
+      event = await triggerRandomEvent();
+    }
+    
+    let narration: string;
+    let options: EventChoice[];
+
     if (event) {
-      nextSceneSummary = event.description;
       renderer.event(`[事件] ${event.title}`);
 
       // 如果是战斗事件，则直接进入战斗
@@ -55,18 +65,20 @@ export async function mainLoop() {
         lastPlayerChoice = `你刚刚经历了一场激战，击败了 ${enemy.name}。`;
         continue;
       }
+      
+      ({ narration, options } = await sceneManager.handleEvent(event));
     } else {
         // 如果没有事件，则使用玩家上一步的选择作为场景摘要
         nextSceneSummary = lastPlayerChoice;
-    }
-    
-    // 如果没有事件，也没有玩家输入，给一个默认的场景
-    if (!nextSceneSummary) {
-        nextSceneSummary = '你静静地站着，观察着周围的一切。';
-    }
+        
+        // 如果没有事件，也没有玩家输入，给一个默认的场景
+        if (!nextSceneSummary) {
+            nextSceneSummary = '你静静地站着，观察着周围的一切。';
+        }
 
-    // 2. 调用 AI 说书人生成叙事
-    const { narration, options } = await sceneManager.narrateNextScene(nextSceneSummary, legacySummary);
+        // 2. 调用 AI 说书人生成叙事
+        ({ narration, options } = await sceneManager.narrateNextScene(nextSceneSummary, legacySummary, factionContext));
+    }
     
     // 3. 渲染场景和玩家状态
     const { player } = gameState;
@@ -92,11 +104,23 @@ export async function mainLoop() {
         lastPlayerChoice = '你执行了一个神秘的指令。';
       }
     } else {
-      // 将玩家的选择作为下一次场景生成的输入
-      lastPlayerChoice = selection;
+      // 处理 EventChoice 对象
+      if (typeof selection === 'object') {
+        const choice = selection as EventChoice;
+        if (choice.action === 'continue') {
+          // 如果是 continue，则将 lastPlayerChoice 设为空字符串
+          // 这样在下一次循环中，如果没有新事件，游戏会进入默认的“静观其变”状态
+          lastPlayerChoice = '';
+          continue;
+        }
+        // 对于其他 action，例如 'narrate'，我们将文本作为 AI 输入
+        lastPlayerChoice = choice.text;
+      } else {
+        // 兜底处理，理论上不应该发生
+        lastPlayerChoice = selection;
+      }
       // TODO: 在这里可以根据玩家的选择，实际地改变游戏状态
       // 例如，如果选项是 "1. 拔剑攻击"，则应进入战斗状态。
-      // 目前，我们只是简单地将选择反馈给 AI。
     }
   }
 }

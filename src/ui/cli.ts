@@ -1,4 +1,5 @@
 import inquirer from 'inquirer';
+import type { EventChoice } from '../core/eventEngine';
 
 /**
  * CLI 输入处理器
@@ -8,15 +9,22 @@ export const cli = {
    * 向玩家展示选项并获取选择
    * @param message 提示信息
    * @param choices 选项列表
-   * @returns 玩家选择的字符串
+   * @returns 玩家选择的完整 EventChoice 对象
    */
-  prompt: async (message: string, choices: string[]): Promise<string> => {
+  prompt: async (message: string, choices: (EventChoice | string)[]): Promise<EventChoice | string> => {
+    const inquirerChoices = choices.map(choice => {
+        if (typeof choice === 'string') {
+            return { name: choice, value: choice };
+        }
+        return { name: choice.text, value: choice };
+    });
+
     const { selection } = await inquirer.prompt([
       {
         type: 'list',
         name: 'selection',
         message,
-        choices,
+        choices: inquirerChoices,
       },
     ]);
     return selection;

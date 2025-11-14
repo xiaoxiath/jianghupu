@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import type { EventChoice } from '../core/eventEngine';
 
 /**
  * 文本渲染器，用于输出带样式的文本
@@ -54,3 +55,13 @@ export const renderer = {
     console.log(chalk.blue.bold(`👤 ${text}`));
   },
 };
+
+/**
+ * 渲染事件选项
+ * @param choices 选项数组
+ */
+export function renderChoices(choices: EventChoice[]) {
+  choices.forEach((choice, index) => {
+    console.log(chalk.yellow(`[${index + 1}] ${choice.text}`));
+  });
+}

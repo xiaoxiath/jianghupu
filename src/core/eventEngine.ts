@@ -8,6 +8,8 @@ import { gameState } from './state';
 import { getRandomInt } from './rng';
 import { prisma as db } from './db';
 import { modLoader } from './modLoader';
+import { AICoreService } from './ai/AICoreService';
+import { buildContext } from './ai/contextBuilder';
 
 /**
  * 事件的类型
@@ -18,12 +20,22 @@ export type GameEventType = '战斗' | '机缘' | '社交' | '交易' | '陷阱'
 /**
  * 游戏事件的基础结构
  */
+/**
+ * 事件选项的接口
+ */
+export interface EventChoice {
+  text: string;
+  action: string;
+}
+
 export interface GameEvent {
   id: string;
   type: GameEventType;
   title: string;
   description: string; // 用于生成场景摘要的文本
   trigger: (state: any, helpers: any) => boolean; // 触发条件函数
+  choices?: EventChoice[];
+  once?: boolean;
 }
 
 // --- 触发器辅助函数 ---
@@ -50,7 +62,7 @@ let eventPool: GameEvent[] = [];
  * 从主数据和所有 Mod 中加载和解析事件。
  */
 export async function initializeEventEngine(): Promise<void> {
-  const eventData = await modLoader.getMergedData<{ id: string; type: GameEventType; title: string; description: string; trigger: string }>('events.json');
+  const eventData = await modLoader.getMergedData<{ id: string; type: GameEventType; title: string; description: string; trigger: string; choices?: EventChoice[], once?: boolean }>('events.json');
 
   eventPool = eventData.map(data => ({
     ...data,
@@ -68,10 +80,14 @@ export async function initializeEventEngine(): Promise<void> {
  */
 export async function triggerRandomEvent(): Promise<GameEvent | null> {
   const state = gameState;
-  if (!state) return null;
+  if (!state || !state.player) return null;
 
   const possibleEvents = [];
   for (const event of eventPool) {
+    // 检查事件是否是一次性事件，并且是否已经被触发过
+    if (event.once && state.player.triggeredOnceEvents.includes(event.id)) {
+      continue;
+    }
     try {
       // 注意：对于异步触发器，我们需要 await
       const shouldTrigger = await Promise.resolve(event.trigger(state, triggerHelpers));
@@ -87,8 +103,46 @@ export async function triggerRandomEvent(): Promise<GameEvent | null> {
     // 如果有多个事件可以触发，随机选择一个
     const eventToTrigger = possibleEvents[getRandomInt(0, possibleEvents.length - 1)]!;
     console.log(`[Event Engine] Triggered event: ${eventToTrigger.title}`);
+    
+    // 如果是一次性事件，则记录下来
+    if (eventToTrigger.once) {
+      state.player.triggeredOnceEvents.push(eventToTrigger.id);
+    }
+    
     return eventToTrigger;
   }
 
   return null;
+}
+
+/**
+ * 触发一个由 AI 驱动的动态事件。
+ */
+export async function triggerDynamicEvent(): Promise<void> {
+  const aiService = AICoreService.getInstance();
+  
+  // 1. 构建上下文
+  const context = buildContext(gameState);
+  
+  // 2. 定义指令
+  const instruction = "基于以上背景，生成一个符合当前情景的、可能发生的江湖传闻或小事件。事件应简短、有趣，并与玩家的当前状态和位置有一定关联。";
+  
+  // 3. 组合成最终的 Prompt
+  const prompt = `${context}\n\n**任务指令**\n${instruction}`;
+
+  const response = await aiService.generate(prompt);
+
+  if (response.success && response.content) {
+    const newEvent: GameEvent = {
+      id: `dyn-event-${Date.now()}`,
+      type: '机缘',
+      title: '奇遇',
+      description: response.content,
+      trigger: () => false, // 直接触发，不通过事件池
+    };
+    gameState.eventQueue.push(newEvent);
+    console.log(`[Event Engine] Triggered dynamic AI event: ${newEvent.title}`);
+  } else {
+    console.error("[Event Engine] Failed to generate dynamic event from AI.");
+  }
 }

@@ -4,6 +4,10 @@
     "type": "机缘",
     "title": "来自异世的低语",
     "description": "你似乎听到了来自世界之外的声音，谈论着什么叫做'MOD'。",
-    "trigger": "true"
+    "trigger": "true",
+    "once": true,
+    "choices": [
+      { "text": "倾听这异世的低语。", "action": "continue" }
+    ]
   }
 ]

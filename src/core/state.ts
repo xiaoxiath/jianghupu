@@ -4,7 +4,7 @@ import { archiveWorldState, loadWorldFromArchive } from './archive.js';
 import { logger } from '../utils/logger.js';
 import type { Npc } from './npc.js';
 import { modLoader } from './modLoader.js';
-import { initializeEventEngine } from './eventEngine.js';
+import { initializeEventEngine, type GameEvent } from './eventEngine.js';
 
 /**
  * 全局游戏状态
@@ -12,6 +12,8 @@ import { initializeEventEngine } from './eventEngine.js';
 export interface GameState {
   player: PlayerState;
   world: World;
+  eventQueue: GameEvent[];
+  triggeredOnceEvents: Set<string>;
 }
 
 /**
@@ -29,6 +31,7 @@ interface SerializableWorld {
 export interface SerializableGameState {
     player: PlayerState;
     world: SerializableWorld;
+    triggeredOnceEvents: string[];
 }
 
 /**
@@ -43,6 +46,8 @@ async function createInitialGameState(): Promise<GameState> {
   const initialState: GameState = {
     player,
     world,
+    eventQueue: [],
+    triggeredOnceEvents: new Set(),
   };
 
   try {
@@ -99,6 +104,7 @@ export function serializeGameState(): SerializableGameState {
       locations: Array.from(gameState.world.locations.entries()),
       npcs: gameState.world.npcs,
     },
+    triggeredOnceEvents: Array.from(gameState.triggeredOnceEvents),
   };
 }
 
@@ -121,5 +127,7 @@ export function deserializeGameState(loadedState: SerializableGameState): void {
       locations: locationsMap,
       npcs: loadedState.world.npcs,
     },
+    eventQueue: [],
+    triggeredOnceEvents: new Set(loadedState.triggeredOnceEvents || []),
   };
 }

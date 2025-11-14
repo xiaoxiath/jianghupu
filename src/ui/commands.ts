@@ -2,6 +2,7 @@ import { serializeGameState, deserializeGameState, gameState } from '../core/sta
 import { writeSaveGame, readSaveGame, saveFileExists } from '../utils/fileStore.js';
 import { archiveWorldState } from '../core/archive.js';
 import { renderer } from './renderer.js';
+import { triggerDynamicEvent } from '../core/eventEngine.js';
 
 // 假设有一个全局的方式来控制游戏循环，比如一个事件发射器或回调
 // 这里我们用一个简单的标志来示意是否需要重新渲染场景
@@ -43,6 +44,10 @@ export async function handleCommand(command: string): Promise<void> {
     case 'load':
       await handleLoadCommand(args);
       break;
+    case 'dev:trigger_ai_event':
+        await triggerDynamicEvent();
+        renderMessage('正在尝试触发 AI 动态事件...', 'info');
+        break;
     // 在这里可以添加更多的命令，如 'look', 'go', 'attack'
     default:
       renderMessage(`未知指令: "${command}"`, 'error');

@@ -11,45 +11,59 @@ export type RelationshipStatus = typeof RelationshipStatuses[number];
  * 演化所有门派和它们之间的关系。
  * 这个函数应该由时间系统定期调用（例如，每“旬”或每“月”）。
  */
-export async function evolveFactions() {
+export async function evolveFactions(): Promise<string> {
   logger.info('开始演化门派势力...');
+  const events: string[] = [];
 
   const factions = await db.faction.findMany();
 
   for (const faction of factions) {
     // 1. 更新门派声望（基于其成员的行为、事件等）
-    await updateFactionReputation(faction.id);
+    const reputationEvent = await updateFactionReputation(faction.id);
+    if (reputationEvent) events.push(reputationEvent);
 
     // 2. 检查并更新与其他门派的关系
     await updateFactionRelationships(faction.id);
   }
 
   // 3. 检查是否触发门派间的重大事件（如战争）
-  await checkForMajorFactionEvents();
+  const majorEvents = await checkForMajorFactionEvents();
+  events.push(...majorEvents);
 
   logger.info('门派势力演化完成。');
+  
+  if (events.length === 0) {
+    return '江湖风平浪静，各大门派相安无事。';
+  }
+
+  return `江湖中暗流涌动：${events.join(' ')}`;
 }
 
 /**
  * 更新单个门派的声望。
  * @param factionId 门派ID
  */
-async function updateFactionReputation(factionId: number) {
+async function updateFactionReputation(factionId: number): Promise<string | null> {
   const faction = await db.faction.findUnique({ where: { id: factionId } });
-  if (!faction) return;
+  if (!faction) return null;
 
   // 简单的声望变化逻辑：正道缓慢增加，邪宗缓慢减少
   let reputationChange = 0;
   if (faction.alignment === '正道') {
-    reputationChange = Math.floor(Math.random() * 5); // 0-4
+    reputationChange = Math.floor(Math.random() * 3); // 0-2
   } else if (faction.alignment === '邪宗') {
-    reputationChange = -Math.floor(Math.random() * 5); // -4-0
+    reputationChange = -Math.floor(Math.random() * 3); // -2-0
   }
+
+  if (reputationChange === 0) return null;
 
   await db.faction.update({
     where: { id: factionId },
     data: { reputation: { increment: reputationChange } },
   });
+  
+  const changeText = reputationChange > 0 ? '略有上升' : '有所下降';
+  return `${faction.name}的声望${changeText}。`;
 }
 
 /**
@@ -83,7 +97,8 @@ async function updateFactionRelationships(factionId: number) {
 /**
  * 检查是否触发了门派间的重大事件，如战争、结盟等。
  */
-async function checkForMajorFactionEvents() {
+async function checkForMajorFactionEvents(): Promise<string[]> {
+    const events: string[] = [];
     const hostileThreshold = 100; // 敌对度达到100则宣战
     const relationships = await db.factionRelationship.findMany({
         where: {
@@ -104,10 +119,11 @@ async function checkForMajorFactionEvents() {
         });
 
         if (!existingEvent) {
+            const reason = `双方敌对关系达到顶点，${rel.source.name} 对 ${rel.target.name} 宣战！`;
             const details = {
                 faction1: rel.source.name,
                 faction2: rel.target.name,
-                reason: `双方敌对关系达到顶点，${rel.source.name} 对 ${rel.target.name} 宣战！`,
+                reason,
             };
             await db.eventLog.create({
                 data: {
@@ -116,7 +132,9 @@ async function checkForMajorFactionEvents() {
                     details: JSON.stringify(details),
                 },
             });
-            logger.info(`[重大事件] ${rel.source.name} 对 ${rel.target.name} 宣战！`);
+            logger.info(`[重大事件] ${reason}`);
+            events.push(reason);
         }
     }
+    return events;
 }

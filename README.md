@@ -1,4 +1,4 @@
-# 江湖残卷 - AI 驱动的武侠 Roguelike 叙事引擎
+# 江湖残卷 - AI 驱动的武侠 Roguelike AVG 游戏
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/xiaoxiath/jianghupu)
 [![License: ISC](https://img.shields.io/badge/License-ISC-blue.svg)](https://opensource.org/licenses/ISC)
