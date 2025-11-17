@@ -8,7 +8,7 @@ import { prisma as db } from '../core/db.js';
  * 处理角色死亡和传承
  */
 export async function handleLegacy(store: GameStore, timeSystem: TimeSystem) {
-  const oldPlayer = store.getState().player;
+  const oldPlayer = store.state.player;
   renderer.system(`${oldPlayer.name} 的一生结束了。`);
 
   // 1. 记录关于旧玩家的传说

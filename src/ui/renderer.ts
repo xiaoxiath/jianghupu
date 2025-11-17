@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import type { EventChoice } from '../core/eventEngine';
+import type { EventChoice } from '../core/events/types';
 
 /**
  * 文本渲染器，用于输出带样式的文本

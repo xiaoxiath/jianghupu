@@ -41,7 +41,7 @@ export function addExp(exp: number, store: GameStore) {
   store.dispatch({ type: 'ADD_EXP', payload: { exp } });
   renderer.system(`你获得了 ${exp} 点经验。`);
 
-  const player = store.getState().player;
+  const player = store.state.player;
   const requiredExp = getExpForNextLevel(player.level);
   if (player.xp < requiredExp) {
     renderer.system(`当前经验: ${player.xp}/${requiredExp}`);

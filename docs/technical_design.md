@@ -2,6 +2,37 @@
 
 ---
 
+## AI 服务配置
+
+为了与大语言模型（LLM）进行交互，项目设计了一个灵活的 AI 核心系统。所有与 LLM 相关的配置都集中在 `src/config/ai.ts` 文件中，并通过环境变量进行设置。
+
+支持以下环境变量：
+
+- `LLM_PROVIDER`: 指定要使用的 LLM 服务。支持 `'ollama'` 和 `'openai'`（待实现）。默认为 `'ollama'`。
+- `LLM_BASE_URL`: LLM 服务的 API 地址。默认为 Ollama 的 `http://localhost:11434`。
+- `LLM_MODEL`: 要使用的具体模型名称。默认为 `'deepseek-r1:7b'`。
+- `LLM_API_KEY`: 用于访问受保护的 LLM 服务（例如 OpenAI）的 API 密钥。
+
+### 配置示例
+
+- **使用本地 Ollama (默认)**:
+    无需设置环境变量，系统将自动使用默认配置。
+
+- **切换 Ollama 模型**:
+
+    ```bash
+    export LLM_MODEL=another-ollama-model
+    ```
+
+- **连接 OpenAI 服务 (待实现)**:
+    在实现了 `OpenAIProvider` 后，可以这样配置：
+
+    ```bash
+    export LLM_PROVIDER=openai
+    export LLM_API_KEY=your_openai_api_key
+    export LLM_MODEL=gpt-4
+
+
 ## 一、总体架构
 
 ### 技术栈
@@ -436,3 +467,31 @@ async function generateNarration(prompt: BardPrompt): Promise<BardOutput> {
 ---
 
 > “代码之下，亦有江湖。每一个循环，皆是命运的呼吸。”
+
+## AI 服务配置
+
+为了与大语言模型（LLM）进行交互，项目设计了一个灵活的 AI 核心系统。所有与 LLM 相关的配置都集中在 `src/config/ai.ts` 文件中，并通过环境变量进行设置。
+
+支持以下环境变量：
+
+-   `LLM_PROVIDER`: 指定要使用的 LLM 服务。支持 `'ollama'` 和 `'openai'`（待实现）。默认为 `'ollama'`。
+-   `LLM_BASE_URL`: LLM 服务的 API 地址。默认为 Ollama 的 `http://localhost:11434`。
+-   `LLM_MODEL`: 要使用的具体模型名称。默认为 `'deepseek-r1:7b'`。
+-   `LLM_API_KEY`: 用于访问受保护的 LLM 服务（例如 OpenAI）的 API 密钥。
+
+### 配置示例
+
+-   **使用本地 Ollama (默认)**:
+    无需设置环境变量，系统将自动使用默认配置。
+
+-   **切换 Ollama 模型**:
+    ```bash
+    export LLM_MODEL=another-ollama-model
+    ```
+
+-   **连接 OpenAI 服务 (待实现)**:
+    在实现了 `OpenAIProvider` 后，可以这样配置：
+    ```bash
+    export LLM_PROVIDER=openai
+    export LLM_API_KEY=your_openai_api_key
+    export LLM_MODEL=gpt-4

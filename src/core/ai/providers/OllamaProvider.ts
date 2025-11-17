@@ -1,22 +1,24 @@
 import type { ILLMProvider } from './ILLMProvider';
 import type { LLMRequest, LLMResponse } from '../types';
-
-const OLLAMA_CONFIG = {
-  baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-  model: process.env.OLLAMA_MODEL || 'deepseek-r1:7b',
-};
+import aiConfig from '../../../config/ai';
 
 /**
  * 与本地 Ollama 服务交互的 LLM 提供方。
  */
 export class OllamaProvider implements ILLMProvider {
   public async generate(request: LLMRequest): Promise<LLMResponse> {
+    const { baseUrl, model } = aiConfig.config;
+
+    if (!baseUrl) {
+      throw new Error('Ollama baseUrl is not configured.');
+    }
+
     try {
-      const response = await fetch(`${OLLAMA_CONFIG.baseUrl}/api/generate`, {
+      const response = await fetch(`${baseUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: OLLAMA_CONFIG.model,
+          model: model,
           prompt: request.prompt,
           format: request.format, // 传递 format 参数
           stream: false,

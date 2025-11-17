@@ -1,6 +1,5 @@
 import { renderer } from './ui/renderer.js';
 import { cli } from './ui/cli.js';
-import type { GameState } from './core/state.js';
 import { handleCommand, sceneNeedsUpdate } from './ui/commands.js';
 import { SceneManager } from './narrator/sceneManager.js';
 import { GameStore } from './core/store/store.js';
@@ -10,8 +9,6 @@ import { TimeSystem } from './systems/timeSystem.js';
 import { startCombat } from './systems/combat.js';
 import { createBandit } from './core/npc.js';
 import { handleLegacy } from './systems/legacy.js';
-import { updateNpcEngine } from './core/npcEngine.js';
-import { evolveFactions } from './systems/sect.js';
 import { prisma as db } from './core/db.js';
 
 const INPUT_COMMAND_CHOICE = '输入指令 (save/load/exit)';

@@ -2,7 +2,7 @@ import { singleton, inject } from 'tsyringe';
 import { produce, type Draft } from 'immer';
 import { EventEmitter } from 'events';
 import type { EventResult, GameEvent } from '../events/types.js';
-import { type GameState, initialState, type SerializableGameState } from '../state.js';
+import { type GameState, initialState, type PlayerState } from '../state.js';
 import { updateNpcEngine } from '../npcEngine.js';
 import { playerReducer } from './reducers/playerReducer.js';
 import { eventReducer } from './reducers/eventReducer.js';
@@ -22,7 +22,9 @@ type Action =
   | { type: 'SHIFT_EVENT_FROM_QUEUE' }
   | { type: 'UPDATE_NPCS', payload: { npcs: any[] } }
   | { type: 'UPDATE_SCENE_NPCS', payload: { npcs: any[] } }
-  | { type: 'WORLD_UPDATE' };
+  | { type: 'WORLD_UPDATE' }
+  | { type: 'SET_PLAYER', payload: { player: PlayerState } }
+  | { type: 'ADD_EXP', payload: { exp: number } };
 
 // Combines all slice reducers into a single root reducer.
 function rootReducer(draft: Draft<GameState>, action: any): GameState | void {
@@ -34,6 +36,9 @@ function rootReducer(draft: Draft<GameState>, action: any): GameState | void {
   switch (action.type) {
     case 'SET_STATE':
       return action.payload.state;
+    case 'SET_PLAYER':
+      draft.player = action.payload.player;
+      break;
     case 'ADVANCE_TIME':
       draft.time.day += 1;
       // more logic here

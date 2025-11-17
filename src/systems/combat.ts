@@ -24,7 +24,7 @@ function calculateDamage(attacker: Combatant, defender: Combatant): number {
 export async function startCombat(enemy: Combatant, store: GameStore): Promise<CombatResult> {
   renderer.system(`你遭遇了 ${enemy.name}！`);
 
-  const player = store.getState().player;
+  const player = store.state.player;
   let playerHp = player.stats.hp;
 
   while (playerHp > 0 && enemy.stats.hp > 0) {

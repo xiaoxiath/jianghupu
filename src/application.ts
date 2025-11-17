@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { container } from "tsyringe";
 import { enableMapSet } from 'immer';
 
-import { OllamaProvider } from "./core/ai/providers/OllamaProvider.js";
+import { createLlmProvider } from "./core/ai/llmProviderFactory.js";
 import { mainLoop } from './mainLoop.js';
 import { initializeGameState } from './core/initialization.js';
 import { logger } from './utils/logger.js';
@@ -65,7 +65,7 @@ export class Application {
   }
 
   private registerDependencies(): void {
-    container.register("ILLMProvider", { useClass: OllamaProvider });
+    container.register("ILLMProvider", { useFactory: () => createLlmProvider() });
     
     // Core services
     container.registerSingleton(AICoreService);

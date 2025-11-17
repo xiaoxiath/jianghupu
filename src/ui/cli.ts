@@ -1,5 +1,5 @@
 import inquirer from 'inquirer';
-import type { EventChoice } from '../core/eventEngine';
+import type { EventChoice } from '../core/events/types';
 
 /**
  * CLI 输入处理器

@@ -1,12 +1,13 @@
 import type { Draft } from 'immer';
-import type { GameState, PlayerState } from '../../state';
+import type { PlayerState } from '../../state';
 import type { EventResult } from '../../events/types';
 
 // Define a more specific action type for this reducer
 type PlayerAction =
   | { type: 'SET_PLAYER_NAME', payload: { name: string } }
   | { type: 'APPLY_EVENT_RESULT', payload: { result: EventResult } }
-  | { type: 'UPDATE_INVENTORY', payload: { inventory: any[] } };
+  | { type: 'UPDATE_INVENTORY', payload: { inventory: any[] } }
+  | { type: 'ADD_EXP', payload: { exp: number } };
 
 export function playerReducer(draft: Draft<PlayerState>, action: any): void {
   switch (action.type) {
@@ -31,6 +32,9 @@ export function playerReducer(draft: Draft<PlayerState>, action: any): void {
       break;
     case 'UPDATE_INVENTORY':
       draft.inventory = action.payload.inventory;
+      break;
+    case 'ADD_EXP':
+      draft.xp += action.payload.exp;
       break;
     default:
       break;

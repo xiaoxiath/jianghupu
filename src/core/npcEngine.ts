@@ -1,5 +1,4 @@
 import { GameStore } from './store/store.js';
-import { renderer } from '../ui/renderer.js';
 import { AIBard } from '../narrator/aiBard.js';
 
 /**
