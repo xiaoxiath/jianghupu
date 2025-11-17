@@ -1,4 +1,5 @@
 import { type PlayerState, createInitialPlayer } from './player.js';
+export type { PlayerState } from './player.js';
 import { type World, generateWorld, type Location } from './world.js';
 export type { Location } from './world.js';
 import { archiveWorldState, loadWorldFromArchive } from './archive.js';

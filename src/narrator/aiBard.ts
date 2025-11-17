@@ -131,57 +131,21 @@ export class AIBard {
     };
     const fullPrompt = this.promptManager.buildPrompt('trader', templateData);
     const response = await this.generateRaw(fullPrompt);
-
-    if (!response.success || !response.content) {
-      console.error('Trader AI failed to respond.');
-      return null;
-    }
-
-    try {
-      const jsonString = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(jsonString) as TradeInfo;
-    } catch (error) {
-      console.error('Failed to parse Trader AI response:', error);
-      return null;
-    }
+    return this._parseJsonResponse<TradeInfo>(response, 'Trader AI');
   }
 
   public async generateSkillMasterScene(playerState: any): Promise<SkillMasterInfo | null> {
     const templateData = { player: playerState };
     const fullPrompt = this.promptManager.buildPrompt('skill_master', templateData);
     const response = await this.generateRaw(fullPrompt);
-
-    if (!response.success || !response.content) {
-      console.error('Skill Master AI failed to respond.');
-      return null;
-    }
-
-    try {
-      const jsonString = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(jsonString) as SkillMasterInfo;
-    } catch (error) {
-      console.error('Failed to parse Skill Master AI response:', error);
-      return null;
-    }
+    return this._parseJsonResponse<SkillMasterInfo>(response, 'Skill Master AI');
   }
 
   public async identifyItem(item: any): Promise<ItemIdentificationInfo | null> {
     const templateData = { item_to_identify: item };
     const fullPrompt = this.promptManager.buildPrompt('item_master', templateData);
     const response = await this.generateRaw(fullPrompt);
-
-    if (!response.success || !response.content) {
-      console.error('Item Master AI failed to respond.');
-      return null;
-    }
-
-    try {
-      const jsonString = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
-      return JSON.parse(jsonString) as ItemIdentificationInfo;
-    } catch (error) {
-      console.error('Failed to parse Item Master AI response:', error);
-      return null;
-    }
+    return this._parseJsonResponse<ItemIdentificationInfo>(response, 'Item Master AI');
   }
 
   public async generateNpcGrowthNarrative(npc: any, oldStrength: number, newStrength: number): Promise<string | null> {
@@ -237,45 +201,21 @@ export class AIBard {
       };
     }
 
+    const parsedContent = this._parseJsonResponse<{ narration: string; options: RawLLMOption[] }>(response, 'Narrator AI');
+
+    if (!parsedContent) {
+      return {
+        narration: '（AI说书人言语错乱，似乎看到了无法理解的景象。）',
+        options: [
+          { text: '1. [调试] 检查返回的 JSON 结构是否正确', action: 'debug' },
+          { text: '2. [调试] 查看 aiBard.ts 中的解析逻辑', action: 'debug' },
+        ],
+      };
+    }
+
     try {
-      // 解析 LLM 返回的 JSON 字符串
-      // console.log('[Debug] AI Core Service raw response string:', response.content);
-      
-      let parsedContent: { narration: string; options: RawLLMOption[] };
-      try {
-        let jsonString = response.content;
-
-        // 增强的 JSON 提取逻辑，适配 markdown 代码块
-        const jsonMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```|({[\s\S]*})/);
-        const potentialJson = jsonMatch ? jsonMatch[1] || jsonMatch[2] : null;
-
-        if (potentialJson) {
-          jsonString = potentialJson;
-        } else {
-          // 兼容非 markdown 的 JSON
-          const startIndex = jsonString.indexOf('{');
-          const endIndex = jsonString.lastIndexOf('}');
-          if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-            jsonString = jsonString.substring(startIndex, endIndex + 1);
-          } else {
-            throw new Error(`在响应中找不到有效的JSON对象: ${response.content}`);
-          }
-        }
-        
-        parsedContent = JSON.parse(jsonString);
-      } catch (e) {
-        console.error("在 aiBard 中处理 AI 响应时出错:", e, "原始响应:", response.content);
-        return {
-          narration: '（AI说书人言语错乱，似乎看到了无法理解的景象。）',
-          options: [
-            { text: '1. [调试] 检查返回的 JSON 结构是否正确', action: 'debug' },
-            { text: '2. [调试] 查看 aiBard.ts 中的解析逻辑', action: 'debug' },
-          ],
-        };
-      }
-
       // 确保 narration 存在
-      if (!parsedContent || typeof parsedContent.narration !== 'string') {
+      if (typeof parsedContent.narration !== 'string') {
         throw new Error(`LLM response is missing narration: ${JSON.stringify(parsedContent)}`);
       }
 
@@ -284,7 +224,7 @@ export class AIBard {
       // 检查 options 是否存在且为有效数组
       if (Array.isArray(parsedContent.options) && parsedContent.options.length > 0) {
         finalOptions = parsedContent.options
-          .map(opt => ({
+          .map((opt: RawLLMOption) => ({
             text: (typeof opt.text === 'string' ? opt.text.replace(/^\d+\.\s*/, '').trim() : ''),
             action: 'narrate', // 默认为叙事动作
             result: opt.result || { description: `你选择了"${opt.text}"` }, // 提供默认 result
@@ -321,6 +261,45 @@ export class AIBard {
           { text: '2. [调试] 查看 aiBard.ts 中的解析逻辑', action: 'debug' },
         ],
       };
+    }
+  }
+
+  /**
+   * A private helper to parse JSON from AI responses with robust error handling.
+   */
+  private _parseJsonResponse<T>(
+    response: { success: boolean; content: string | null; error?: string },
+    aiName: string = 'AI'
+  ): T | null {
+    if (!response.success || !response.content) {
+      console.error(`${aiName} failed to respond:`, response.error);
+      return null;
+    }
+
+    try {
+      let jsonString = response.content;
+
+      // Enhanced JSON extraction logic, compatible with markdown code blocks
+      const jsonMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```|({[\s\S]*})/);
+      const potentialJson = jsonMatch ? jsonMatch[1] || jsonMatch[2] : null;
+
+      if (potentialJson) {
+        jsonString = potentialJson;
+      } else {
+        // Fallback for non-markdown JSON
+        const startIndex = jsonString.indexOf('{');
+        const endIndex = jsonString.lastIndexOf('}');
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+          jsonString = jsonString.substring(startIndex, endIndex + 1);
+        } else {
+          throw new Error(`Could not find a valid JSON object in the response: ${response.content}`);
+        }
+      }
+      
+      return JSON.parse(jsonString) as T;
+    } catch (error) {
+      console.error(`Failed to parse ${aiName} response:`, error, "Raw response:", response.content);
+      return null;
     }
   }
 }

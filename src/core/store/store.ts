@@ -4,9 +4,12 @@ import { EventEmitter } from 'events';
 import type { EventResult, GameEvent } from '../events/types.js';
 import { type GameState, initialState, type SerializableGameState } from '../state.js';
 import { updateNpcEngine } from '../npcEngine.js';
-import { evolveFactions } from '../../systems/sect.js';
+import { playerReducer } from './reducers/playerReducer.js';
+import { eventReducer } from './reducers/eventReducer.js';
+import { worldReducer } from './reducers/worldReducer.js';
 import { AIBard } from '../../narrator/aiBard.js';
 import { TimeSystem } from '../../systems/timeSystem.js';
+import { FactionSystem } from '../../systems/factionSystem.js';
 
 type Action =
   | { type: 'SET_PLAYER_NAME', payload: { name: string } }
@@ -21,13 +24,34 @@ type Action =
   | { type: 'UPDATE_SCENE_NPCS', payload: { npcs: any[] } }
   | { type: 'WORLD_UPDATE' };
 
+// Combines all slice reducers into a single root reducer.
+function rootReducer(draft: Draft<GameState>, action: any): GameState | void {
+  playerReducer(draft.player, action);
+  eventReducer(draft, action);
+  worldReducer(draft, action);
+
+  // Handle actions that are not part of a slice reducer
+  switch (action.type) {
+    case 'SET_STATE':
+      return action.payload.state;
+    case 'ADVANCE_TIME':
+      draft.time.day += 1;
+      // more logic here
+      break;
+    case 'WORLD_UPDATE':
+      // This is a placeholder, the actual logic is in the async action creator
+      break;
+  }
+}
+
 @singleton()
 export class GameStore extends EventEmitter {
   private _state: GameState;
 
   constructor(
     @inject(AIBard) private bard: AIBard,
-    @inject(TimeSystem) private timeSystem: TimeSystem
+    @inject(TimeSystem) private timeSystem: TimeSystem,
+    @inject(FactionSystem) private factionSystem: FactionSystem
   ) {
     super();
     this._state = initialState;
@@ -44,59 +68,7 @@ export class GameStore extends EventEmitter {
       return;
     }
 
-    const nextState = produce(this._state, (draft: Draft<GameState>) => {
-      switch (action.type) {
-        case 'SET_PLAYER_NAME':
-          draft.player.name = action.payload.name;
-          break;
-        case 'APPLY_EVENT_RESULT':
-          const { result } = action.payload;
-          if (result.player_stats) {
-            draft.player.stats.hp = Math.max(0, (draft.player.stats.hp ?? 0) + (result.player_stats.hp ?? 0));
-            draft.player.stats.mp = Math.max(0, (draft.player.stats.mp ?? 0) + (result.player_stats.mp ?? 0));
-          }
-          if (result.player_attributes) {
-            draft.player.attributes.strength += result.player_attributes.strength ?? 0;
-            draft.player.attributes.constitution += result.player_attributes.constitution ?? 0;
-            draft.player.attributes.intelligence += result.player_attributes.intelligence ?? 0;
-            draft.player.attributes.agility += result.player_attributes.agility ?? 0;
-          }
-          if (result.player_mood) {
-            draft.player.mood = result.player_mood;
-          }
-          break;
-        case 'ADD_EVENT_TO_QUEUE':
-          draft.eventQueue.push(action.payload.event);
-          break;
-        case 'ADD_TRIGGERED_ONCE_EVENT':
-          // Assuming triggeredOnceEvents is a Set in the state
-          draft.triggeredOnceEvents.add(action.payload.eventId);
-          break;
-        case 'ADVANCE_TIME':
-          draft.time.day += 1;
-          // more logic here
-          break;
-        case 'SET_STATE':
-          return action.payload.state;
-        case 'UPDATE_INVENTORY':
-          draft.player.inventory = action.payload.inventory;
-          break;
-        case 'SHIFT_EVENT_FROM_QUEUE':
-          draft.eventQueue.shift();
-          break;
-        case 'UPDATE_NPCS':
-          draft.world.npcs = action.payload.npcs;
-          break;
-        case 'UPDATE_SCENE_NPCS':
-          draft.sceneNpcs = action.payload.npcs;
-          break;
-        case 'WORLD_UPDATE':
-          // This is a placeholder, the actual logic is in the async action creator
-          break;
-        default:
-          break;
-      }
-    });
+    const nextState = produce(this._state, (draft) => rootReducer(draft, action));
 
     if (this._state !== nextState) {
       this._state = nextState;
@@ -107,7 +79,7 @@ export class GameStore extends EventEmitter {
   public updateWorld() {
     return async (dispatch: (action: Action) => void) => {
       await updateNpcEngine(this, this.bard);
-      await evolveFactions(this.timeSystem);
+      await this.factionSystem.evolveFactions();
       dispatch({ type: 'WORLD_UPDATE' });
     };
   }

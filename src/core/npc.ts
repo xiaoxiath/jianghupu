@@ -19,6 +19,8 @@ export interface Combatant {
 /**
  * NPC 的完整数据结构，继承自战斗单元并包含长期演化属性
  */
+export type NpcCapability = 'trade' | 'learn_skill' | 'identify_item' | 'quest';
+
 export interface Npc extends Combatant {
   id: number;
   realm: string; // 境界
@@ -26,6 +28,7 @@ export interface Npc extends Combatant {
   alive: boolean;
   locationId: number; // 所在地点 ID
   reputation: number; // 声望
+  capabilities: NpcCapability[]; // NPC 的交互能力
 }
 
 
@@ -67,6 +70,7 @@ export function createNpc(type: NpcType, locationId: number): Npc {
     reputation: 0,
     stats: { hp: 100, maxHp: 100, mp: 50, maxMp: 50 },
     attributes: { strength: 10, constitution: 10 },
+    capabilities: [],
   };
 
   switch (type) {
@@ -74,12 +78,14 @@ export function createNpc(type: NpcType, locationId: number): Npc {
       return {
         ...baseNpc,
         name: '行脚商人',
+        capabilities: ['trade'],
         // 可在此处为商人添加特定属性，如商品列表
       };
     case 'quest_giver':
       return {
         ...baseNpc,
         name: '忧心忡忡的村民',
+        capabilities: ['quest'],
         // 可在此处为任务发布者添加特定属性，如任务 ID
       };
     case 'skill_master':
@@ -87,12 +93,14 @@ export function createNpc(type: NpcType, locationId: number): Npc {
         ...baseNpc,
         name: '扫地僧',
         realm: '宗师',
+        capabilities: ['learn_skill'],
       };
     case 'item_master':
       return {
         ...baseNpc,
         name: '多宝先生',
         realm: '大宗师',
+        capabilities: ['identify_item'],
       };
     case 'bandit':
     default:

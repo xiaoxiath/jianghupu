@@ -10,11 +10,34 @@ import type { Location } from '../core/world';
 import type { GameEvent, EventChoice } from '../core/events/types.js';
 import { renderChoices } from '../ui/renderer';
 import { TimeSystem } from '../systems/timeSystem';
-import { createNpc, type NpcType } from '../core/npc';
+import { createNpc, type NpcType, type NpcCapability } from '../core/npc';
 import { GameStore } from '../core/store/store.js';
 import { Item } from '../core/item';
 
 type NarrativeTone = '宿命' | '诙谐' | '哲理' | '疯癫';
+
+const interactionRegistry: Record<NpcCapability, EventChoice> = {
+  trade: {
+    text: '与商人交易',
+    action: 'trade',
+    result: { description: '你走上前去，想看看他卖些什么。' }
+  },
+  learn_skill: {
+    text: '向高人请教',
+    action: 'learn_skill',
+    result: { description: '你恭敬地行了一礼。' }
+  },
+  identify_item: {
+    text: '请专家鉴定物品',
+    action: 'identify_item',
+    result: { description: '你将身上的物品拿出来，请专家过目。' }
+  },
+  quest: {
+    text: '询问有什么能帮忙的',
+    action: 'quest',
+    result: { description: '你上前询问对方是否需要帮助。' }
+  }
+};
 
 /**
  * 场景管理器，负责驱动 AI 叙事流程
@@ -82,28 +105,24 @@ export class SceneManager {
     // 3. 调用 AI 说书人
     const output = await this.bard.generateNarration(promptData);
 
-    // 4. 根据场景中的 NPC 添加互动选项
-    if (gameState.sceneNpcs.some(npc => npc.name === '行脚商人')) {
-      output.options.push({
-        text: '与商人交易',
-        action: 'trade',
-        result: { description: '你走上前去，想看看他卖些什么。' }
-      });
+    // 4. 根据场景中 NPC 的能力动态添加互动选项
+    const npcInteractionOptions: EventChoice[] = [];
+    const addedCapabilities = new Set<NpcCapability>();
+
+    for (const npc of gameState.sceneNpcs) {
+      for (const capability of npc.capabilities) {
+        // 确保同一种能力的选项只添加一次
+        if (!addedCapabilities.has(capability)) {
+          const interaction = interactionRegistry[capability];
+          if (interaction) {
+            npcInteractionOptions.push(interaction);
+            addedCapabilities.add(capability);
+          }
+        }
+      }
     }
-    if (gameState.sceneNpcs.some(npc => npc.name === '扫地僧')) {
-      output.options.push({
-        text: '向扫地僧请教',
-        action: 'learn_skill',
-        result: { description: '你恭敬地向扫地僧行了一礼。' }
-      });
-    }
-    if (gameState.sceneNpcs.some(npc => npc.name === '多宝先生')) {
-      output.options.push({
-        text: '请多宝先生鉴定物品',
-        action: 'identify_item',
-        result: { description: '你将身上的物品拿出来，请多宝先生过目。' }
-      });
-    }
+
+    output.options.push(...npcInteractionOptions);
 
     return output;
   }
