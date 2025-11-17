@@ -24,17 +24,13 @@ type Action =
 @singleton()
 export class GameStore extends EventEmitter {
   private _state: GameState;
-  private bard: AIBard;
-  private timeSystem: TimeSystem;
 
   constructor(
-    @inject(AIBard) bard: AIBard,
-    @inject(TimeSystem) timeSystem: TimeSystem
+    @inject(AIBard) private bard: AIBard,
+    @inject(TimeSystem) private timeSystem: TimeSystem
   ) {
     super();
     this._state = initialState;
-    this.bard = bard;
-    this.timeSystem = timeSystem;
   }
 
   get state(): GameState {

@@ -1,5 +1,4 @@
 import { prisma } from './db';
-import type { NPC as PrismaNpc } from '@prisma/client';
 import type { GameState } from './state';
 import type { Npc } from './npc.js';
 import { logger } from '../utils/logger';
@@ -15,35 +14,29 @@ import { logger } from '../utils/logger';
 export async function archiveWorldState(gameState: GameState): Promise<void> {
   logger.info('Archiving world state to database...');
 
+  // 归档 NPC 数据
   const npcPromises = gameState.world.npcs.map(npc => {
     const location = gameState.world.locations.get(npc.locationId);
     if (!location) {
       logger.warn(`NPC "${npc.name}" has an invalid location ID: ${npc.locationId}. Skipping.`);
-      return Promise.resolve(); // 跳过无效数据
+      return Promise.resolve();
     }
-
     return prisma.nPC.upsert({
-      where: { name: npc.name }, // 使用 unique 字段来查找
-      update: {
-        sect: npc.sect,
-        realm: npc.realm,
-        alive: npc.alive,
-        location: location.name, // 存储地点名称
-        reputation: npc.reputation,
-      },
-      create: {
-        name: npc.name,
-        sect: npc.sect,
-        realm: npc.realm,
-        alive: npc.alive,
-        location: location.name,
-        reputation: npc.reputation,
-      },
+      where: { name: npc.name },
+      update: { sect: npc.sect, realm: npc.realm, alive: npc.alive, location: location.name, reputation: npc.reputation },
+      create: { name: npc.name, sect: npc.sect, realm: npc.realm, alive: npc.alive, location: location.name, reputation: npc.reputation },
     });
   });
 
+  // 归档 triggeredOnceEvents
+  const triggeredOnceEventsPromise = prisma.gameMeta.upsert({
+    where: { key: 'triggeredOnceEvents' },
+    update: { value: JSON.stringify(Array.from(gameState.triggeredOnceEvents)) },
+    create: { key: 'triggeredOnceEvents', value: JSON.stringify(Array.from(gameState.triggeredOnceEvents)) },
+  });
+
   try {
-    await Promise.all(npcPromises);
+    await Promise.all([...npcPromises, triggeredOnceEventsPromise]);
     logger.info('World state successfully archived.');
   } catch (error) {
     logger.error('Failed to archive world state:', error);
@@ -61,39 +54,40 @@ export async function loadWorldFromArchive(gameState: GameState): Promise<void> 
   logger.info('Loading world state from database...');
   try {
     const dbNPCs = await prisma.nPC.findMany();
+    const triggeredOnceEventsMeta = await prisma.gameMeta.findUnique({
+      where: { key: 'triggeredOnceEvents' },
+    });
 
-    if (dbNPCs.length === 0) {
-      logger.warn('No NPCs found in the database. World state might be fresh.');
-      return;
+    // 加载 NPCs
+    if (dbNPCs.length > 0) {
+      const npcs: Npc[] = dbNPCs.map((dbNpc: any): Npc => {
+        const location = Array.from(gameState.world.locations.values()).find(loc => loc.name === dbNpc.location);
+        return {
+          id: dbNpc.id,
+          name: dbNpc.name,
+          sect: dbNpc.sect ?? undefined,
+          realm: dbNpc.realm,
+          alive: dbNpc.alive,
+          locationId: location ? location.id : -1,
+          reputation: dbNpc.reputation,
+          stats: { hp: 100, maxHp: 100, mp: 50, maxMp: 50 },
+          attributes: { strength: 10, constitution: 10 },
+        };
+      });
+      gameState.world.npcs = npcs.filter(npc => npc.locationId !== -1);
+      logger.info(`Successfully loaded ${gameState.world.npcs.length} NPCs from the database.`);
+    } else {
+      logger.warn('No NPCs found in the database.');
     }
 
-    // 将数据库模型转换为游戏内的 Npc 对象
-    const npcs: Npc[] = dbNPCs.map((dbNpc: PrismaNpc): Npc => {
-      const location = Array.from(gameState.world.locations.values()).find(loc => loc.name === dbNpc.location);
-      return {
-        id: dbNpc.id,
-        name: dbNpc.name,
-        sect: dbNpc.sect ?? undefined,
-        realm: dbNpc.realm,
-        alive: dbNpc.alive,
-        locationId: location ? location.id : -1, // 如果找不到地点，给一个无效ID
-        reputation: dbNpc.reputation,
-        // 补全战斗属性的默认值
-        stats: { hp: 100, maxHp: 100, mp: 50, maxMp: 50 },
-        attributes: { strength: 10, constitution: 10 },
-      };
-    });
-
-    // 过滤掉那些地点无效的 NPC
-    gameState.world.npcs = npcs.filter((npc: Npc) => {
-      if (npc.locationId === -1) {
-        logger.warn(`Could not find location "${npc.name}" for NPC, removing from world.`);
-        return false;
-      }
-      return true;
-    });
-
-    logger.info(`Successfully loaded ${gameState.world.npcs.length} NPCs from the database.`);
+    // 加载 triggeredOnceEvents
+    if (triggeredOnceEventsMeta) {
+      const eventIds = JSON.parse(triggeredOnceEventsMeta.value);
+      gameState.triggeredOnceEvents = new Set(eventIds);
+      logger.info(`Successfully loaded ${gameState.triggeredOnceEvents.size} once-triggered events.`);
+    } else {
+      logger.warn('No triggeredOnceEvents found in the database.');
+    }
   } catch (error) {
     logger.error('Failed to load world state from database:', error);
     throw new Error('Database operation failed during world state loading.');

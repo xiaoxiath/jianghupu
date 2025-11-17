@@ -93,3 +93,13 @@ model Item {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// 用于存储全局游戏元数据，例如已触发的 "once" 事件
+model GameMeta {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

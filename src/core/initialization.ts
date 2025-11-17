@@ -53,16 +53,10 @@ export async function initializeGameState(
   store: GameStore,
   modLoader: ModLoader
 ): Promise<void> {
-  // 1. 加载所有 Mods
-  await modLoader.scanAndLoadMods();
-
-  // 2. 初始化事件引擎
+  // 1. 初始化事件引擎
   await eventEngine.initialize();
-
-  // 3. 运行 Mod 的 seeder
-  await modLoader.runModSeeders();
   
-  // 4. 创建初始游戏状态
+  // 2. 创建初始游戏状态
   const state = await createInitialGameState(timeSystem);
 
   // 5. 将初始状态分发到 Store

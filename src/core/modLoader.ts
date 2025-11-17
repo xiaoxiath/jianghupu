@@ -40,24 +40,35 @@ export class ModLoader {
     logger.info('Scanning for mods...');
     try {
       const modFolders = await fs.readdir(MODS_DIR, { withFileTypes: true });
-      for (const dirent of modFolders) {
-        if (dirent.isDirectory()) {
+      const modPromises = modFolders
+        .filter(dirent => dirent.isDirectory())
+        .map(async (dirent) => {
           const modPath = path.join(MODS_DIR, dirent.name);
           const manifestPath = path.join(modPath, 'manifest.json');
           try {
             const manifestContent = await fs.readFile(manifestPath, 'utf-8');
             const manifest = JSON.parse(manifestContent) as ModManifest;
-            this.mods.push({ manifest, path: modPath });
-            logger.info(`Loaded mod: ${manifest.name} (v${manifest.version})`);
-
-            await this.loadModAssets(modPath, manifest);
-
-          } catch (error) {
-            logger.warn(`Could not load mod in ${dirent.name}. Invalid or missing manifest.json.`);
+            return { manifest, path: modPath };
+          } catch (error: any) {
+            if (error instanceof SyntaxError) {
+              logger.warn(`Could not load mod in ${dirent.name}. Invalid JSON in manifest.json: ${error.message}`);
+            } else {
+              logger.warn(`Could not load mod in ${dirent.name}. Missing or unreadable manifest.json.`);
+            }
+            return null;
           }
-        }
-      }
+        });
+
+      const loadedMods = (await Promise.all(modPromises)).filter((mod): mod is Mod => mod !== null);
+      
+      this.mods = loadedMods;
       this.sortMods();
+
+      for (const mod of this.mods) {
+        logger.info(`Loaded mod: ${mod.manifest.name} (v${mod.manifest.version})`);
+        await this.loadModAssets(mod.path, mod.manifest);
+      }
+
       logger.info(`Found and loaded ${this.mods.length} mods.`);
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -111,13 +122,16 @@ export class ModLoader {
    * @param fileName The name of the data file (e.g., 'events.json').
    * @returns A merged array of data objects.
    */
-  public async getMergedData<T>(fileName: string): Promise<T[]> {
-    let mergedData: T[] = [];
+  public async getMergedData<T extends { id: string }>(fileName: string): Promise<T[]> {
+    const mergedData: Map<string, T> = new Map();
     const baseDataPath = path.join(process.cwd(), 'src', 'data', fileName);
 
     try {
       const baseContent = await fs.readFile(baseDataPath, 'utf-8');
-      mergedData = JSON.parse(baseContent);
+      const baseData = JSON.parse(baseContent) as T[];
+      for (const item of baseData) {
+        mergedData.set(item.id, item);
+      }
     } catch (error) {
       logger.warn(`Could not read base data file: ${fileName}.`);
     }
@@ -127,9 +141,14 @@ export class ModLoader {
       try {
         const modContent = await fs.readFile(modDataPath, 'utf-8');
         const modData = JSON.parse(modContent) as T[];
-        // Simple concatenation, mods can add new items.
-        // For more complex merging, a deep merge strategy would be needed.
-        mergedData = mergedData.concat(modData);
+        for (const item of modData) {
+          if (item.id) {
+            if (mergedData.has(item.id)) {
+              logger.info(`Overwriting data for id "${item.id}" in ${fileName} from mod "${mod.manifest.name}".`);
+            }
+            mergedData.set(item.id, item);
+          }
+        }
         logger.info(`Merged data from ${mod.manifest.id}/${fileName}`);
       } catch (error: any) {
         if (error.code !== 'ENOENT') {
@@ -138,7 +157,7 @@ export class ModLoader {
       }
     }
 
-    return mergedData;
+    return Array.from(mergedData.values());
   }
 
   /**

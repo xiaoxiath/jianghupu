@@ -243,12 +243,35 @@ export class AIBard {
       
       let parsedContent: { narration: string; options: RawLLMOption[] };
       try {
-        // LLM 有时会返回被包裹在 ```json ... ``` 中的代码块，或者其他非JSON字符
-        const jsonString = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
+        let jsonString = response.content;
+
+        // 增强的 JSON 提取逻辑，适配 markdown 代码块
+        const jsonMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```|({[\s\S]*})/);
+        const potentialJson = jsonMatch ? jsonMatch[1] || jsonMatch[2] : null;
+
+        if (potentialJson) {
+          jsonString = potentialJson;
+        } else {
+          // 兼容非 markdown 的 JSON
+          const startIndex = jsonString.indexOf('{');
+          const endIndex = jsonString.lastIndexOf('}');
+          if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            jsonString = jsonString.substring(startIndex, endIndex + 1);
+          } else {
+            throw new Error(`在响应中找不到有效的JSON对象: ${response.content}`);
+          }
+        }
+        
         parsedContent = JSON.parse(jsonString);
       } catch (e) {
-        console.error("Failed to parse LLM JSON response:", e, "Raw response:", response.content);
-        throw new Error(`Invalid JSON from LLM: ${response.content}`);
+        console.error("在 aiBard 中处理 AI 响应时出错:", e, "原始响应:", response.content);
+        return {
+          narration: '（AI说书人言语错乱，似乎看到了无法理解的景象。）',
+          options: [
+            { text: '1. [调试] 检查返回的 JSON 结构是否正确', action: 'debug' },
+            { text: '2. [调试] 查看 aiBard.ts 中的解析逻辑', action: 'debug' },
+          ],
+        };
       }
 
       // 确保 narration 存在
@@ -264,9 +287,9 @@ export class AIBard {
           .map(opt => ({
             text: (typeof opt.text === 'string' ? opt.text.replace(/^\d+\.\s*/, '').trim() : ''),
             action: 'narrate', // 默认为叙事动作
-            result: opt.result, // 直接传递 result 对象
+            result: opt.result || { description: `你选择了"${opt.text}"` }, // 提供默认 result
           }))
-          .filter(opt => opt.text.length > 1 && opt.result); // 确保选项文本和结果都存在
+          .filter(opt => opt.text.length > 0); // 仅确保选项文本存在
       } else {
         finalOptions = [];
       }

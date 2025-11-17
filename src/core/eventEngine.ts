@@ -86,7 +86,7 @@ export class EventEngine {
       const eventToTrigger = possibleEvents[getRandomInt(0, possibleEvents.length - 1)]!;
       console.log(`[Event Engine] Triggered event: ${eventToTrigger.title}`);
       if (eventToTrigger.once) {
-        this.store.dispatch({ type: 'ADD_TRIGGERED_ONCE_EVENT', payload: { eventId: eventToTrigger.id } });
+        await this.store.dispatch({ type: 'ADD_TRIGGERED_ONCE_EVENT', payload: { eventId: eventToTrigger.id } });
       }
       return eventToTrigger;
     }

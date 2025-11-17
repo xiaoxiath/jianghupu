@@ -42,7 +42,6 @@ export async function mainLoop(
     loopCount++;
     console.log('\n' + '---'.repeat(20));
 
-    let gameState = store.state;
 
     // 1. 活态世界演化
     await store.dispatch(store.updateWorld());
@@ -50,11 +49,11 @@ export async function mainLoop(
 
     // 2. 检查事件队列或触发随机事件
     let event = null;
-    if (gameState.eventQueue.length > 0) {
-      event = gameState.eventQueue[0];
-      store.dispatch({ type: 'SHIFT_EVENT_FROM_QUEUE' });
+    if (store.state.eventQueue.length > 0) {
+      event = store.state.eventQueue[0];
+      await store.dispatch({ type: 'SHIFT_EVENT_FROM_QUEUE' });
     } else {
-      event = await eventEngine.triggerRandomEvent(gameState);
+      event = await eventEngine.triggerRandomEvent(store.state);
     }
     
     let narration: string;
@@ -77,7 +76,7 @@ export async function mainLoop(
         continue;
       }
       
-      ({ narration, options } = await sceneManager.processEvent(event, gameState));
+      ({ narration, options } = await sceneManager.processEvent(event, store.state));
     } else {
         // 如果没有事件，则使用玩家上一步的选择作为场景摘要
         nextSceneSummary = lastPlayerChoice;
@@ -88,11 +87,11 @@ export async function mainLoop(
         }
 
         // 2. 调用 AI 说书人生成叙事
-        ({ narration, options } = await sceneManager.narrateNextScene(nextSceneSummary, legacySummary, factionContext, gameState));
+        ({ narration, options } = await sceneManager.narrateNextScene(nextSceneSummary, legacySummary, factionContext, store.state));
     }
     
     // 3. 渲染场景和玩家状态
-    const { player } = gameState;
+    const { player } = store.state;
     renderer.system(`你: ${player.name} | 境界: ${player.realm} | 气血: ${player.stats.hp}/${player.stats.maxHp} | 内力: ${player.stats.mp}/${player.stats.maxMp}`);
     renderer.narrator(narration);
 
@@ -119,7 +118,7 @@ export async function mainLoop(
       if (typeof selection === 'object') {
         const choice = selection as EventChoice;
         
-        const actionResult = await sceneManager.handlePlayerAction(choice, gameState);
+        const actionResult = await sceneManager.handlePlayerAction(choice, store.state);
 
         if (actionResult) {
           // 特殊事件（如交易）返回了完整的场景，直接渲染
@@ -130,7 +129,7 @@ export async function mainLoop(
         } else {
           // 标准动作，应用结果并让下一次循环生成新场景
           if (choice.result) {
-            store.dispatch({ type: 'APPLY_EVENT_RESULT', payload: { result: choice.result } });
+            await store.dispatch({ type: 'APPLY_EVENT_RESULT', payload: { result: choice.result } });
             lastPlayerChoice = choice.result.description;
           } else {
             lastPlayerChoice = choice.text;
