@@ -1,0 +1,35 @@
+{
+  "rules": [
+    {
+      "comment": "用于测试模板引擎的事件",
+      "conditions": {
+        "eventType": "test_event"
+      },
+      "layer": "L0_Template"
+    },
+    {
+      "comment": "用于测试轻量级模型的事件",
+      "conditions": {
+        "eventType": "light_event"
+      },
+      "layer": "L1_LightLLM",
+      "model": "qwen:0.5b"
+    },
+    {
+      "comment": "一个高重要性的剧情事件，强制使用重量级模型",
+      "conditions": {
+        "eventType": "main_quest_update",
+        "importance": 10
+      },
+      "layer": "L2_HeavyLLM"
+    },
+    {
+      "comment": "普通的战斗描述，可以使用轻量级模型",
+      "conditions": {
+        "eventType": "combat_log"
+      },
+      "layer": "L1_LightLLM",
+      "model": "qwen:0.5b"
+    }
+  ]
+}

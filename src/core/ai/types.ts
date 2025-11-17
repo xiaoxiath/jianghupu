@@ -10,6 +10,8 @@ export interface LLMRequest {
   context?: Record<string, any>;
   // 指定返回格式，以便在 provider 中进行特殊处理
   format?: 'json' | 'text';
+ // 指定要使用的模型，如果未提供，则使用提供商的默认模型
+ model?: string;
 }
 
 /**
@@ -19,4 +21,10 @@ export interface LLMResponse {
   success: boolean;
   content: string;
   error?: string;
+  metadata?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    durationSeconds?: number;
+  };
 }

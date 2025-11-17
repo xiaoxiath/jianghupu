@@ -7,7 +7,8 @@ import aiConfig from '../../../config/ai';
  */
 export class OllamaProvider implements ILLMProvider {
   public async generate(request: LLMRequest): Promise<LLMResponse> {
-    const { baseUrl, model } = aiConfig.config;
+    const { baseUrl, model: defaultModel } = aiConfig.config;
+    const model = request.model || defaultModel;
 
     if (!baseUrl) {
       throw new Error('Ollama baseUrl is not configured.');
@@ -30,11 +31,22 @@ export class OllamaProvider implements ILLMProvider {
         throw new Error(`Ollama API request failed with status ${response.status}: ${errorText}`);
       }
 
-      const result = (await response.json()) as { response: string };
+      const result = (await response.json()) as {
+        response: string;
+        prompt_eval_count: number;
+        eval_count: number;
+        total_duration: number;
+      };
 
       return {
         success: true,
         content: result.response,
+        metadata: {
+          promptTokens: result.prompt_eval_count,
+          completionTokens: result.eval_count,
+          totalTokens: result.prompt_eval_count + result.eval_count,
+          durationSeconds: result.total_duration / 1e9, // 纳秒转秒
+        },
       };
     } catch (error) {
       console.error('[OllamaProvider] Error:', error);

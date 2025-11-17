@@ -22,4 +22,5 @@ export interface GameEvent {
   trigger: ((state: any, helpers: any) => boolean | Promise<boolean>);
   choices?: EventChoice[];
   once?: boolean;
+  importance?: number; // 事件的重要性，用于叙事分发
 }
