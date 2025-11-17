@@ -1,5 +1,7 @@
+import { container } from 'tsyringe';
 import { prisma as db } from '../core/db';
 import { logger } from '../utils/logger';
+import { TimeSystem } from './timeSystem.js';
 
 export const FactionAlignments = ['正道', '邪宗', '中立'] as const;
 export type FactionAlignment = typeof FactionAlignments[number];
@@ -119,6 +121,7 @@ async function checkForMajorFactionEvents(): Promise<string[]> {
         });
 
         if (!existingEvent) {
+            const timeSystem = container.resolve(TimeSystem);
             const reason = `双方敌对关系达到顶点，${rel.source.name} 对 ${rel.target.name} 宣战！`;
             const details = {
                 faction1: rel.source.name,
@@ -128,7 +131,7 @@ async function checkForMajorFactionEvents(): Promise<string[]> {
             await db.eventLog.create({
                 data: {
                     type: 'WAR_START',
-                    timestamp: '当前', // TODO: 应该从时间系统获取
+                    timestamp: timeSystem.getFormattedTime(),
                     details: JSON.stringify(details),
                 },
             });

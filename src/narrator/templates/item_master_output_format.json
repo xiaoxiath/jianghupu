@@ -1,0 +1,12 @@
+{
+  "dialogue": "鉴定师的对话文本...",
+  "identification": {
+    "original_name": "生锈的铁剑",
+    "true_name": "湛卢残刃",
+    "story": "此剑看似破旧，但剑身上刻着两个模糊的古字——‘湛卢’。传闻此剑曾为铸剑宗师欧冶子所铸...若能找到重铸之法，或许能再现其锋芒。",
+    "revealed_effects": [
+      { "type": "attack_bonus", "value": 10 },
+      { "type": "new_skill", "skill_name": "湛卢剑气" }
+    ]
+  }
+}

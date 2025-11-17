@@ -1,148 +1,160 @@
-/**
- * @file 动态事件系统
- * @description 负责管理和触发游戏中的随机事件与奇遇。
- * @see docs/technical_design.md#6-探索与事件系统explorationts
- */
-
-import { gameState } from './state';
+import type { GameState } from './state';
 import { getRandomInt } from './rng';
 import { prisma as db } from './db';
 import { modLoader } from './modLoader';
 import { AICoreService } from './ai/AICoreService';
 import { buildContext } from './ai/contextBuilder';
+import { singleton, container } from 'tsyringe';
+import { GameStore } from './store/store.js';
+import { getTrigger } from './events/triggers.js';
 
-/**
- * 事件的类型
- * @see docs/gdd.md#41-事件模板
- */
 export type GameEventType = '战斗' | '机缘' | '社交' | '交易' | '陷阱' | '幻境';
 
-/**
- * 游戏事件的基础结构
- */
-/**
- * 事件选项的接口
- */
+export type EventResult = {
+  description: string;
+  player_stats?: { hp?: number; mp?: number; };
+  player_attributes?: { strength?: number; constitution?: number; intelligence?: number; agility?: number; };
+  player_mood?: string;
+ data?: any; // For carrying extra payload, e.g., trade details
+};
+
 export interface EventChoice {
-  text: string;
+ text: string;
   action: string;
+  result?: EventResult;
 }
 
 export interface GameEvent {
   id: string;
   type: GameEventType;
   title: string;
-  description: string; // 用于生成场景摘要的文本
-  trigger: (state: any, helpers: any) => boolean; // 触发条件函数
+  description: string;
+  trigger: ((state: GameState, helpers: any) => boolean | Promise<boolean>);
   choices?: EventChoice[];
   once?: boolean;
 }
 
-// --- 触发器辅助函数 ---
-const triggerHelpers = {
-  getRandomInt,
-  async isFactionWarHappening() {
-    const warEvent = await db.eventLog.findFirst({
-      where: { type: 'WAR_START' },
-      orderBy: { createdAt: 'desc' },
-    });
-    // 假设战争持续一段时间
-    if (warEvent) {
-      // 在此可以添加更复杂的逻辑，比如检查战争是否已结束
-      return true;
-    }
-    return false;
-  },
-};
+export class EventEngine {
+  private eventPool: GameEvent[] = [];
+  private triggerHelpers = {
+    getRandomInt,
+    async isFactionWarHappening() {
+      const warEvent = await db.eventLog.findFirst({
+        where: { type: 'WAR_START' },
+        orderBy: { createdAt: 'desc' },
+      });
+      return !!warEvent;
+    },
+  };
 
-// --- 事件加载 ---
-let eventPool: GameEvent[] = [];
+  constructor(private aiService: AICoreService) {}
 
-/**
- * 从主数据和所有 Mod 中加载和解析事件。
- */
-export async function initializeEventEngine(): Promise<void> {
-  const eventData = await modLoader.getMergedData<{ id: string; type: GameEventType; title: string; description: string; trigger: string; choices?: EventChoice[], once?: boolean }>('events.json');
+  public async initialize(): Promise<void> {
+    const eventData = await modLoader.getMergedData<{ id: string; type: GameEventType; title: string; description: string; trigger: string | { id: string, args?: any[] }; choices?: EventChoice[], once?: boolean }>('events.json');
+    
+    this.eventPool = eventData.map(data => {
+      let triggerFn: (state: GameState, helpers: any) => boolean | Promise<boolean>;
+      const triggerConfig = typeof data.trigger === 'string' ? { id: data.trigger } : data.trigger;
+      
+      const trigger = getTrigger(triggerConfig.id);
 
-  eventPool = eventData.map(data => ({
-    ...data,
-    trigger: new Function('state', 'helpers', `
-      const { getRandomInt, isFactionWarHappening } = helpers;
-      return ${data.trigger};
-    `) as (state: any, helpers: any) => boolean,
-  }));
-}
-
-
-/**
- * 尝试触发一个随机事件。
- * @returns 如果触发了事件，则返回事件描述；否则返回 null。
- */
-export async function triggerRandomEvent(): Promise<GameEvent | null> {
-  const state = gameState;
-  if (!state || !state.player) return null;
-
-  const possibleEvents = [];
-  for (const event of eventPool) {
-    // 检查事件是否是一次性事件，并且是否已经被触发过
-    if (event.once && state.player.triggeredOnceEvents.includes(event.id)) {
-      continue;
-    }
-    try {
-      // 注意：对于异步触发器，我们需要 await
-      const shouldTrigger = await Promise.resolve(event.trigger(state, triggerHelpers));
-      if (shouldTrigger) {
-        possibleEvents.push(event);
+      if (!trigger) {
+        console.warn(`[EventEngine] Trigger function "${triggerConfig.id}" not found for event "${data.title}". Event will never trigger.`);
+        triggerFn = () => false;
+      } else {
+        // Pass the whole trigger config object to the trigger function
+        triggerFn = (state, helpers) => trigger(state, triggerConfig);
       }
-    } catch (error) {
-      console.error(`Error triggering event ${event.id}:`, error);
+
+      return {
+        ...data,
+        trigger: triggerFn,
+      };
+    });
+  }
+
+  public async triggerRandomEvent(state: GameState): Promise<GameEvent | null> {
+    if (!state || !state.player) return null;
+    const possibleEvents = [];
+    for (const event of this.eventPool) {
+      if (event.once && state.triggeredOnceEvents.has(event.id)) {
+        continue;
+      }
+      try {
+        if (await Promise.resolve(event.trigger(state, this.triggerHelpers))) {
+          possibleEvents.push(event);
+        }
+      } catch (error) {
+        console.error(`Error triggering event ${event.id}:`, error);
+      }
+    }
+
+    if (possibleEvents.length > 0) {
+      const eventToTrigger = possibleEvents[getRandomInt(0, possibleEvents.length - 1)]!;
+      console.log(`[Event Engine] Triggered event: ${eventToTrigger.title}`);
+      if (eventToTrigger.once) {
+        const store = container.resolve(GameStore);
+        store.dispatch({ type: 'ADD_TRIGGERED_ONCE_EVENT', payload: { eventId: eventToTrigger.id } });
+      }
+      return eventToTrigger;
+    }
+    return null;
+  }
+
+  public async triggerDynamicEvent(state: GameState): Promise<void> {
+    const context = buildContext(state);
+    const instruction = "基于以上背景，生成一个符合当前情景的、可能发生的江湖传闻或小事件。事件应简短、有趣，并与玩家的当前状态和位置有一定关联。";
+    const prompt = `${context}\n\n**任务指令**\n${instruction}`;
+    const response = await this.aiService.generate({ prompt });
+
+    if (response.success && response.content) {
+      const newEvent: GameEvent = {
+        id: `dyn-event-${Date.now()}`,
+        type: '机缘',
+        title: '奇遇',
+        description: response.content,
+        trigger: () => false,
+      };
+      const store = container.resolve(GameStore);
+      store.dispatch({ type: 'ADD_EVENT_TO_QUEUE', payload: { event: newEvent } });
+      console.log(`[Event Engine] Triggered dynamic AI event: ${newEvent.title}`);
+    } else {
+      console.error("[Event Engine] Failed to generate dynamic event from AI.");
     }
   }
 
-  if (possibleEvents.length > 0) {
-    // 如果有多个事件可以触发，随机选择一个
-    const eventToTrigger = possibleEvents[getRandomInt(0, possibleEvents.length - 1)]!;
-    console.log(`[Event Engine] Triggered event: ${eventToTrigger.title}`);
-    
-    // 如果是一次性事件，则记录下来
-    if (eventToTrigger.once) {
-      state.player.triggeredOnceEvents.push(eventToTrigger.id);
-    }
-    
-    return eventToTrigger;
-  }
-
-  return null;
-}
-
-/**
- * 触发一个由 AI 驱动的动态事件。
- */
-export async function triggerDynamicEvent(): Promise<void> {
-  const aiService = AICoreService.getInstance();
-  
-  // 1. 构建上下文
-  const context = buildContext(gameState);
-  
-  // 2. 定义指令
-  const instruction = "基于以上背景，生成一个符合当前情景的、可能发生的江湖传闻或小事件。事件应简短、有趣，并与玩家的当前状态和位置有一定关联。";
-  
-  // 3. 组合成最终的 Prompt
-  const prompt = `${context}\n\n**任务指令**\n${instruction}`;
-
-  const response = await aiService.generate(prompt);
-
-  if (response.success && response.content) {
-    const newEvent: GameEvent = {
-      id: `dyn-event-${Date.now()}`,
-      type: '机缘',
-      title: '奇遇',
-      description: response.content,
-      trigger: () => false, // 直接触发，不通过事件池
-    };
-    gameState.eventQueue.push(newEvent);
-    console.log(`[Event Engine] Triggered dynamic AI event: ${newEvent.title}`);
-  } else {
-    console.error("[Event Engine] Failed to generate dynamic event from AI.");
+  public applyEventResult(result: EventResult): void {
+    const store = container.resolve(GameStore);
+    store.dispatch({ type: 'APPLY_EVENT_RESULT', payload: { result } });
   }
 }
+
+// --- Legacy Exports for Backward Compatibility ---
+async function legacyInitializeEventEngine(): Promise<void> {
+  const eventEngine = container.resolve(EventEngine);
+  await eventEngine.initialize();
+}
+
+async function legacyTriggerRandomEvent(): Promise<GameEvent | null> {
+  const store = container.resolve(GameStore);
+  const eventEngine = container.resolve(EventEngine);
+  return eventEngine.triggerRandomEvent(store.getState());
+}
+
+async function legacyTriggerDynamicEvent(): Promise<void> {
+  const store = container.resolve(GameStore);
+  const eventEngine = container.resolve(EventEngine);
+  return eventEngine.triggerDynamicEvent(store.getState());
+}
+
+function legacyApplyEventResult(result: EventResult): void {
+  const eventEngine = container.resolve(EventEngine);
+  eventEngine.applyEventResult(result);
+}
+
+export {
+  legacyInitializeEventEngine as initializeEventEngine,
+  legacyTriggerRandomEvent as triggerRandomEvent,
+  legacyTriggerDynamicEvent as triggerDynamicEvent,
+  legacyApplyEventResult as applyEventResult,
+};

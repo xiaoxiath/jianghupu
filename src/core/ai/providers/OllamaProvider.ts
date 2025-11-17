@@ -1,57 +1,45 @@
-import type { ILLMProvider } from "./ILLMProvider";
-import type { LLMRequest, LLMResponse } from "../types";
+import type { ILLMProvider } from './ILLMProvider';
+import type { LLMRequest, LLMResponse } from '../types';
 
-interface OllamaResponse {
-  response: string;
-  // 根据需要可以添加更多字段
-}
+const OLLAMA_CONFIG = {
+  baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
+  model: process.env.OLLAMA_MODEL || 'deepseek-r1:7b',
+};
 
 /**
- * ILLMProvider 的一个具体实现，用于与本地运行的 Ollama 服务进行交互。
+ * 与本地 Ollama 服务交互的 LLM 提供方。
  */
 export class OllamaProvider implements ILLMProvider {
-  /**
-   * 向 Ollama 服务发送生成请求。
-   *
-   * @param request 包含 prompt 和上下文的请求对象。
-   * @returns 一个解析为 LLMResponse 的 Promise。
-   */
   public async generate(request: LLMRequest): Promise<LLMResponse> {
-    console.log(`[OllamaProvider] Sending prompt to Ollama: ${request.prompt}`);
     try {
-      const response = await fetch("http://localhost:11434/api/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const response = await fetch(`${OLLAMA_CONFIG.baseUrl}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: "llama2", // 或者您希望使用的任何模型
+          model: OLLAMA_CONFIG.model,
           prompt: request.prompt,
-          stream: false, // 为了简化，我们先不处理流式响应
+          format: request.format, // 传递 format 参数
+          stream: false,
         }),
       });
 
       if (!response.ok) {
-        const errorBody = await response.text();
-        console.error(`[OllamaProvider] Ollama API responded with status ${response.status}: ${errorBody}`);
-        throw new Error(`Ollama API responded with status ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Ollama API request failed with status ${response.status}: ${errorText}`);
       }
 
-      const data = (await response.json()) as OllamaResponse;
-
-      if (typeof data.response !== "string") {
-        throw new Error("Invalid response format from Ollama API");
-      }
+      const result = (await response.json()) as { response: string };
 
       return {
         success: true,
-        content: data.response,
+        content: result.response,
       };
     } catch (error) {
-      console.error("[OllamaProvider] Error calling Ollama API:", error);
+      console.error('[OllamaProvider] Error:', error);
       return {
         success: false,
-        content: "Error generating content from Ollama.", // 提供一个非空的错误消息
+        content: '',
+        error: error instanceof Error ? error.message : 'Unknown error in OllamaProvider',
       };
     }
   }

@@ -1,0 +1,16 @@
+{
+  "dialogue": "商人的对话文本...",
+  "goods": [
+    {
+      "name": "金创药",
+      "description": "疗伤圣药，能快速回复气血。",
+      "buy_price": 50
+    }
+  ],
+  "acquisitions": [
+    {
+      "name": "生锈的铁剑",
+      "sell_price": 10
+    }
+  ]
+}

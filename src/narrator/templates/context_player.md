@@ -1,0 +1,1 @@
+- 玩家状态: 姓名: {{name}}, 境界: {{realm}}, 气血: {{hp}}/{{maxHp}}, 内力: {{mp}}/{{maxMp}}, 心境: {{mood}}, 最近事件: {{last_action_result}}

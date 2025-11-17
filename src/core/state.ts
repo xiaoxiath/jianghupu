@@ -1,10 +1,14 @@
 import { type PlayerState, createInitialPlayer } from './player.js';
 import { type World, generateWorld, type Location } from './world.js';
+export type { Location } from './world.js';
 import { archiveWorldState, loadWorldFromArchive } from './archive.js';
 import { logger } from '../utils/logger.js';
 import type { Npc } from './npc.js';
 import { modLoader } from './modLoader.js';
-import { initializeEventEngine, type GameEvent } from './eventEngine.js';
+import { container } from 'tsyringe';
+import { EventEngine, type GameEvent } from './eventEngine.js';
+import { TimeSystem, type TimeState } from '../systems/timeSystem.js';
+import { GameStore } from './store/store.js';
 
 /**
  * 全局游戏状态
@@ -12,12 +16,14 @@ import { initializeEventEngine, type GameEvent } from './eventEngine.js';
 export interface GameState {
   player: PlayerState;
   world: World;
+  time: TimeState;
   eventQueue: GameEvent[];
   triggeredOnceEvents: Set<string>;
+  sceneNpcs: Npc[]; // 当前场景中临时出现的 NPC
 }
 
 /**
- * 可被 JSON 安全序列化的游戏世界状态
+* 可被 JSON 安全序列化的游戏世界状态
  */
 interface SerializableWorld {
     locations: [number, Location][];
@@ -31,6 +37,7 @@ interface SerializableWorld {
 export interface SerializableGameState {
     player: PlayerState;
     world: SerializableWorld;
+    time: TimeState;
     triggeredOnceEvents: string[];
 }
 
@@ -38,16 +45,17 @@ export interface SerializableGameState {
  * 创建一个初始游戏状态
  * @returns 初始游戏状态
  */
-async function createInitialGameState(): Promise<GameState> {
-  // TODO: 将来允许玩家输入姓名
+async function createInitialGameState(timeSystem: TimeSystem): Promise<GameState> {
   const player = createInitialPlayer('无名氏');
   const world = generateWorld('jianghu-seed'); // 使用一个固定的种子
 
   const initialState: GameState = {
     player,
     world,
+    time: timeSystem.getTimeState(),
     eventQueue: [],
     triggeredOnceEvents: new Set(),
+    sceneNpcs: [],
   };
 
   try {
@@ -75,36 +83,40 @@ async function createInitialGameState(): Promise<GameState> {
 /**
  * 全局状态容器
  */
-export let gameState: GameState;
-
 export async function initializeGameState(): Promise<void> {
   // 1. 加载所有 Mods
   await modLoader.scanAndLoadMods();
 
-  // 2. 初始化事件引擎，它会使用 ModLoader 加载合并后的事件
-  await initializeEventEngine();
+  // 2. 初始化事件引擎
+  const eventEngine = container.resolve(EventEngine);
+  await eventEngine.initialize();
 
-  // 3. 运行 Mod 的 seeder，这必须在主数据库和表结构准备好之后
-  // 注意：这假设 `prisma db push` 或 migrate 已经运行
+  // 3. 运行 Mod 的 seeder
   await modLoader.runModSeeders();
   
-  // 4. 创建游戏世界状态。这会从数据库加载数据，包括由 Mods 添加的数据。
-  gameState = await createInitialGameState();
+  // 4. 创建初始游戏状态
+  const timeSystem = container.resolve(TimeSystem);
+  const initialState = await createInitialGameState(timeSystem);
+
+  // 5. 将初始状态分发到 Store
+  const store = container.resolve(GameStore);
+  store.dispatch({ type: 'INIT_GAME_STATE', payload: { initialState } });
 }
 
 /**
  * 将当前游戏状态序列化为一个可安全保存的对象。
  * @returns {SerializableGameState} 可序列化的游戏状态
  */
-export function serializeGameState(): SerializableGameState {
+export function serializeGameState(state: GameState): SerializableGameState {
   return {
-    player: gameState.player,
+    player: state.player,
     world: {
-      ...gameState.world,
-      locations: Array.from(gameState.world.locations.entries()),
-      npcs: gameState.world.npcs,
+      ...state.world,
+      locations: Array.from(state.world.locations.entries()),
+      npcs: state.world.npcs,
     },
-    triggeredOnceEvents: Array.from(gameState.triggeredOnceEvents),
+    time: state.time,
+    triggeredOnceEvents: Array.from(state.triggeredOnceEvents),
   };
 }
 
@@ -117,17 +129,6 @@ export function deserializeGameState(loadedState: SerializableGameState): void {
     throw new Error('Invalid or corrupted save data.');
   }
   
-  // 将 location 数组转换回 Map
-  const locationsMap = new Map<number, Location>(loadedState.world.locations);
-
-  gameState = {
-    player: loadedState.player,
-    world: {
-      ...loadedState.world,
-      locations: locationsMap,
-      npcs: loadedState.world.npcs,
-    },
-    eventQueue: [],
-    triggeredOnceEvents: new Set(loadedState.triggeredOnceEvents || []),
-  };
+  const store = container.resolve(GameStore);
+  store.dispatch({ type: 'DESERIALIZE', payload: { state: loadedState } });
 }

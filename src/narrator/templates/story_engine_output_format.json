@@ -1,0 +1,13 @@
+{
+  "trigger_event": false,
+  "event": {
+    "type": "lore | npc | item | environment",
+    "description": "对事件的简短描述，这段描述将作为引子，融入到'江湖百晓生'的场景叙事中。例如：'你注意到路边的一块石碑上似乎刻着一些模糊的字迹。'",
+    "data": {
+      "npc_type": "merchant",
+      "item_id": "unique_sword_01",
+      "lore_id": "secret_cave_map"
+    }
+  },
+  "reasoning": "解释你为何做出此决定的简短理由（例如：'玩家在山脚停留过久，触发奇遇事件。' 或 '时机未到，命运之轮暂无转动。'）"
+}

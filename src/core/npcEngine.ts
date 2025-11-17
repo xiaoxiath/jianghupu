@@ -1,4 +1,5 @@
-import { gameState } from './state.js';
+import { container } from 'tsyringe';
+import { GameStore } from './store/store.js';
 import { renderer } from '../ui/renderer.js';
 
 /**
@@ -6,18 +7,24 @@ import { renderer } from '../ui/renderer.js';
  * 这是活态世界引擎的核心部分
  */
 export function updateNpcEngine() {
-  const npcs = gameState.world.npcs;
+  const store = container.resolve(GameStore);
+  const npcs = store.getState().world.npcs;
 
-  // 简单的 NPC 演化：所有 NPC 都在修炼
-  for (const npc of npcs) {
+  const updatedNpcs = npcs.map(npc => {
     if (npc.alive) {
       const oldStrength = npc.attributes.strength;
-      npc.attributes.strength += 1; // 随时间缓慢变强
-      // 可以添加更多逻辑，例如：
-      // - NPC 移动
-      // - NPC 之间的交互
-      // - NPC 死亡/复活
-      renderer.system(`[江湖演化] ${npc.name} 似乎有所精进 (力量: ${oldStrength} -> ${npc.attributes.strength})。`);
+      const newNpc = {
+        ...npc,
+        attributes: {
+          ...npc.attributes,
+          strength: npc.attributes.strength + 1,
+        },
+      };
+      renderer.system(`[江湖演化] ${npc.name} 似乎有所精进 (力量: ${oldStrength} -> ${newNpc.attributes.strength})。`);
+      return newNpc;
     }
-  }
+    return npc;
+  });
+
+  store.dispatch({ type: 'UPDATE_NPCS', payload: { npcs: updatedNpcs } });
 }

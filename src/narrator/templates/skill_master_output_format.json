@@ -1,0 +1,20 @@
+{
+  "dialogue": "宗师的对话文本...",
+  "opportunities": [
+    {
+      "type": "learn_skill",
+      "text": "学习「定心诀」",
+      "skill": {
+        "name": "定心诀",
+        "description": "一门静心凝神的内功心法，能略微提升你的根骨。",
+        "effect": { "attribute": "constitution", "value": 1 }
+      }
+    },
+    {
+      "type": "improve_skill",
+      "text": "精进「猛虎拳」",
+      "skill_name": "猛虎拳",
+      "improvement": { "power": 5 }
+    }
+  ]
+}

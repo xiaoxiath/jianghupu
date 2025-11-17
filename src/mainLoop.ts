@@ -1,10 +1,12 @@
 import { renderer } from './ui/renderer.js';
 import { cli } from './ui/cli.js';
-import { gameState } from './core/state.js';
+import type { GameState } from './core/state.js';
 import { handleCommand, sceneNeedsUpdate } from './ui/commands.js';
-import { sceneManager } from './narrator/sceneManager.js';
-import { triggerRandomEvent, triggerDynamicEvent, type EventChoice } from './core/eventEngine.js';
+import { SceneManager } from './narrator/sceneManager.js';
+import { GameStore } from './core/store/store.js';
+import { EventEngine, type EventChoice } from './core/eventEngine.js';
 import { startCombat } from './systems/combat.js';
+import { container } from 'tsyringe';
 import { createBandit } from './core/npc.js';
 import { handleLegacy } from './systems/legacy.js';
 import { updateNpcEngine } from './core/npcEngine.js';
@@ -18,6 +20,10 @@ const INPUT_COMMAND_CHOICE = '输入指令 (save/load/exit)';
  */
 export async function mainLoop() {
   renderer.system('游戏开始...');
+
+  const sceneManager = container.resolve(SceneManager);
+  const eventEngine = container.resolve(EventEngine);
+  const store = container.resolve(GameStore);
   
   // 检查是否有历史传承
   const legacyEvents = await db.eventLog.findMany({
@@ -34,7 +40,10 @@ export async function mainLoop() {
     loopCount++;
     console.log('\n' + '---'.repeat(20));
 
+    let gameState = store.getState();
+
     // 1. 活态世界演化
+    // TODO: 这些应该成为 action
     updateNpcEngine();
     const factionContext = await evolveFactions();
 
@@ -43,7 +52,7 @@ export async function mainLoop() {
     if (gameState.eventQueue.length > 0) {
       event = gameState.eventQueue.shift()!;
     } else {
-      event = await triggerRandomEvent();
+      event = await eventEngine.triggerRandomEvent(gameState);
     }
     
     let narration: string;
@@ -66,7 +75,7 @@ export async function mainLoop() {
         continue;
       }
       
-      ({ narration, options } = await sceneManager.handleEvent(event));
+      ({ narration, options } = await sceneManager.processEvent(event, gameState));
     } else {
         // 如果没有事件，则使用玩家上一步的选择作为场景摘要
         nextSceneSummary = lastPlayerChoice;
@@ -77,7 +86,7 @@ export async function mainLoop() {
         }
 
         // 2. 调用 AI 说书人生成叙事
-        ({ narration, options } = await sceneManager.narrateNextScene(nextSceneSummary, legacySummary, factionContext));
+        ({ narration, options } = await sceneManager.narrateNextScene(nextSceneSummary, legacySummary, factionContext, gameState));
     }
     
     // 3. 渲染场景和玩家状态
@@ -87,7 +96,7 @@ export async function mainLoop() {
 
     // 4. 提供选项并获取玩家输入
     const finalOptions = [...options, INPUT_COMMAND_CHOICE];
-    const selection = await cli.prompt('你的选择是？', finalOptions);
+    let selection = await cli.prompt('你的选择是？', finalOptions);
 
     // 5. 处理玩家选择
     if (selection === INPUT_COMMAND_CHOICE) {
@@ -107,20 +116,35 @@ export async function mainLoop() {
       // 处理 EventChoice 对象
       if (typeof selection === 'object') {
         const choice = selection as EventChoice;
-        if (choice.action === 'continue') {
-          // 如果是 continue，则将 lastPlayerChoice 设为空字符串
-          // 这样在下一次循环中，如果没有新事件，游戏会进入默认的“静观其变”状态
-          lastPlayerChoice = '';
+        
+        const actionResult = await sceneManager.handlePlayerAction(choice, gameState);
+
+        if (actionResult) {
+          // 特殊事件（如交易）返回了完整的场景，直接渲染
+          narration = actionResult.narration;
+          options = actionResult.options;
+          // 直接进入下一次循环的渲染阶段
           continue;
+        } else {
+          // 标准动作，应用结果并让下一次循环生成新场景
+          if (choice.result) {
+            const { player } = gameState;
+            if (choice.result.player_stats) {
+              player.stats.hp = Math.max(0, Math.min(player.stats.maxHp, player.stats.hp + (choice.result.player_stats.hp || 0)));
+              player.stats.mp = Math.max(0, Math.min(player.stats.maxMp, player.stats.mp + (choice.result.player_stats.mp || 0)));
+            }
+            if (choice.result.player_mood) {
+              player.mood = choice.result.player_mood;
+            }
+            lastPlayerChoice = choice.result.description;
+          } else {
+            lastPlayerChoice = choice.text;
+          }
         }
-        // 对于其他 action，例如 'narrate'，我们将文本作为 AI 输入
-        lastPlayerChoice = choice.text;
       } else {
-        // 兜底处理，理论上不应该发生
+        // 兜底处理
         lastPlayerChoice = selection;
       }
-      // TODO: 在这里可以根据玩家的选择，实际地改变游戏状态
-      // 例如，如果选项是 "1. 拔剑攻击"，则应进入战斗状态。
     }
   }
 }

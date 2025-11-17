@@ -48,3 +48,58 @@ export function createBandit(): Combatant {
     },
   };
 }
+
+export type NpcType = 'bandit' | 'merchant' | 'quest_giver' | 'skill_master' | 'item_master';
+
+/**
+ * NPC 工厂，用于创建不同类型的 NPC
+ * @param type NPC 类型
+ * @param locationId 所在地点
+ * @returns 一个 Npc 对象
+ */
+export function createNpc(type: NpcType, locationId: number): Npc {
+  const baseNpc = {
+    id: Date.now() + Math.floor(Math.random() * 1000), // 临时唯一 ID
+    realm: '凡人',
+    sect: '无',
+    alive: true,
+    locationId,
+    reputation: 0,
+    stats: { hp: 100, maxHp: 100, mp: 50, maxMp: 50 },
+    attributes: { strength: 10, constitution: 10 },
+  };
+
+  switch (type) {
+    case 'merchant':
+      return {
+        ...baseNpc,
+        name: '行脚商人',
+        // 可在此处为商人添加特定属性，如商品列表
+      };
+    case 'quest_giver':
+      return {
+        ...baseNpc,
+        name: '忧心忡忡的村民',
+        // 可在此处为任务发布者添加特定属性，如任务 ID
+      };
+    case 'skill_master':
+      return {
+        ...baseNpc,
+        name: '扫地僧',
+        realm: '宗师',
+      };
+    case 'item_master':
+      return {
+        ...baseNpc,
+        name: '多宝先生',
+        realm: '大宗师',
+      };
+    case 'bandit':
+    default:
+      const bandit = createBandit();
+      return {
+        ...baseNpc,
+        ...bandit,
+      };
+  }
+}

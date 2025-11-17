@@ -1,0 +1,21 @@
+{
+  "narration": "你的叙事文本...",
+  "options": [
+    {
+      "text": "(例子：一个具体的、与场景相关的行动选项)",
+      "result": {
+        "description": "对玩家显示的该行动的结果描述，例如'你感到一阵空虚，似乎一无所获。'",
+        "player_stats": { "hp": 0, "mp": -5 },
+        "player_mood": "失落"
+      }
+    },
+    {
+      "text": "(例子：另一个具体行动选项)",
+      "result": {
+        "description": "你仔细聆听，捕捉到一丝不寻常的动静。",
+        "player_stats": { "hp": 0, "mp": 0 },
+        "player_mood": "警惕"
+      }
+    }
+  ]
+}

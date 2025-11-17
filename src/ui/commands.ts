@@ -1,6 +1,8 @@
-import { serializeGameState, deserializeGameState, gameState } from '../core/state.js';
+import { serializeGameState, deserializeGameState } from '../core/state.js';
 import { writeSaveGame, readSaveGame, saveFileExists } from '../utils/fileStore.js';
 import { archiveWorldState } from '../core/archive.js';
+import { container } from 'tsyringe';
+import { GameStore } from '../core/store/store.js';
 import { renderer } from './renderer.js';
 import { triggerDynamicEvent } from '../core/eventEngine.js';
 
@@ -72,12 +74,14 @@ async function handleSaveCommand(args: string[]): Promise<void> {
 
   try {
     renderMessage(`正在保存至槽位 ${slot}...`, 'info');
-    const state = serializeGameState();
-    await writeSaveGame(slot, state);
+    const store = container.resolve(GameStore);
+    const state = store.getState();
+    const serializableState = serializeGameState(state);
+    await writeSaveGame(slot, serializableState);
     renderMessage(`游戏快照已成功保存至槽位 ${slot}。`, 'success');
 
     // 现在，归档世界状态到数据库
-    await archiveWorldState(gameState);
+    await archiveWorldState(state);
     renderMessage('世界历史已成功归档。', 'success');
 
   } catch (error) {

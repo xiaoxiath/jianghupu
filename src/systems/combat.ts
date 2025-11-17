@@ -1,6 +1,7 @@
 import { type Combatant } from '../core/npc.js';
 import { renderer } from '../ui/renderer.js';
-import { gameState } from '../core/state.js';
+import { container } from 'tsyringe';
+import { GameStore } from '../core/store/store.js';
 import { addExp } from './cultivation.js';
 
 export type CombatResult = 'win' | 'lose' | 'flee';
@@ -24,7 +25,8 @@ function calculateDamage(attacker: Combatant, defender: Combatant): number {
 export async function startCombat(enemy: Combatant): Promise<CombatResult> {
   renderer.system(`你遭遇了 ${enemy.name}！`);
 
-  const player = gameState.player;
+  const store = container.resolve(GameStore);
+  const player = store.getState().player;
 
   while (player.stats.hp > 0 && enemy.stats.hp > 0) {
     // 玩家回合

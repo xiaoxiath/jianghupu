@@ -1,0 +1,5 @@
+- 历史传承: {{legacy_summary}}
+- 最近江湖动态: {{faction_context}}
+- 世界时间: {{time}}
+- 当前地点: {{location_name}}。{{location_description}}
+- 世界摘要: {{world_summary}}
