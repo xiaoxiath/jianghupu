@@ -24,65 +24,71 @@ import { FactionRepository } from "./repositories/factionRepository.js";
 
 export class Application {
   public async start(): Promise<void> {
-    // --- Immer Setup ---
-    enableMapSet();
+    try {
+      // --- Immer Setup ---
+      enableMapSet();
 
-    // --- Dependency Injection Setup ---
-    this.registerDependencies();
+      // --- Dependency Injection Setup ---
+      this.registerDependencies();
 
-    // --- Instance Resolution ---
-    const store = container.resolve(GameStore);
-    const eventEngine = container.resolve(EventEngine);
-    const modLoader = container.resolve(ModLoader);
-    const timeSystem = container.resolve(TimeSystem);
-    const sceneManager = container.resolve(SceneManager);
+      // --- Instance Resolution ---
+      const store = container.resolve(GameStore);
+      const eventEngine = container.resolve(EventEngine);
+      const modLoader = container.resolve(ModLoader);
+      const timeSystem = container.resolve(TimeSystem);
+      const sceneManager = container.resolve(SceneManager);
 
-    // --- Game Initialization ---
-    const loadMods = await cli.prompt('是否加载 Mods？', ['是', '否']);
-    if (loadMods === '是') {
-      await modLoader.scanAndLoadMods();
+      // --- Game Initialization ---
+      const loadMods = await cli.prompt('是否加载 Mods？', ['是', '否']);
+      if (loadMods === '是') {
+        await modLoader.scanAndLoadMods();
+      }
+
+      logger.info('Initializing game state...');
+      await initializeGameState(
+        eventEngine,
+        timeSystem,
+        store,
+        modLoader
+      );
+
+      if (loadMods === '是') {
+        await modLoader.runModSeeders();
+      }
+
+      // --- Main Loop ---
+      logger.info('Game state initialized. Starting main loop.');
+      await mainLoop(
+        sceneManager,
+        eventEngine,
+        store,
+        timeSystem,
+      );
+    } catch (error) {
+      logger.error('Application startup failed:', error);
+      process.exit(1);
     }
-
-    logger.info('Initializing game state...');
-    await initializeGameState(
-      eventEngine,
-      timeSystem,
-      store,
-      modLoader
-    );
-
-    if (loadMods === '是') {
-      await modLoader.runModSeeders();
-    }
-
-    // --- Main Loop ---
-    logger.info('Game state initialized. Starting main loop.');
-    mainLoop(
-      sceneManager,
-      eventEngine,
-      store,
-      timeSystem,
-    );
   }
 
   private registerDependencies(): void {
+    // GameStore must be registered first (has no dependencies)
+    container.registerSingleton(GameStore);
+
+    // Register LLM provider
     container.register("ILLMProvider", { useFactory: () => createLlmProvider() });
     
-    // Core services
-    container.registerSingleton(AICoreService);
+    // Core services (no GameStore dependency)
     container.registerSingleton(TriggerRegistry);
     container.registerSingleton(ModLoader);
-    container.registerSingleton(AIBard);
     container.registerSingleton(PromptManager);
     container.registerSingleton(FactionRepository);
+    container.registerSingleton(AICoreService);
+    container.registerSingleton(AIBard);
   
     // Systems
     container.registerSingleton(TimeSystem);
     container.registerSingleton(BattleSystem);
     container.registerSingleton(FactionSystem);
-  
-    // GameStore must be registered before other classes that depend on it.
-    container.registerSingleton(GameStore);
   
     // Classes that depend on GameStore
     container.registerSingleton(EventEngine);

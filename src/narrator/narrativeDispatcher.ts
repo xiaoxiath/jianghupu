@@ -319,26 +319,26 @@ export class NarrativeDispatcher {
       return null;
     }
 
+    let jsonString = response.content;
     try {
-      let jsonString = response.content;
-      const jsonMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```|({[\s\S]*})/);
-      const potentialJson = jsonMatch ? jsonMatch[1] || jsonMatch[2] : null;
-
-      if (potentialJson) {
-        jsonString = potentialJson;
+      // 优先匹配 ```json ... ``` 代码块
+      const codeBlockMatch = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch && codeBlockMatch[1]) {
+        jsonString = codeBlockMatch[1];
       } else {
+        // 如果没有代码块，则尝试从第一个 '{' 到最后一个 '}' 提取
         const startIndex = jsonString.indexOf('{');
         const endIndex = jsonString.lastIndexOf('}');
         if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
           jsonString = jsonString.substring(startIndex, endIndex + 1);
-        } else {
-          throw new Error(`Could not find a valid JSON object in the response: ${response.content}`);
         }
+        // 如果两种方式都找不到，则假定整个字符串都是JSON，让后续的JSON.parse处理
       }
       
       return JSON.parse(jsonString) as T;
+
     } catch (error) {
-      console.error(`Failed to parse ${aiName} response:`, error, "Raw response:", response.content);
+      console.error(`Failed to parse ${aiName} response:`, error, `Raw response: "${response.content}"`, `Attempted to parse: "${jsonString}"`);
       return null;
     }
   }
