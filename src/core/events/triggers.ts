@@ -19,6 +19,11 @@ function isPlayerStrong(state: GameState, threshold: number): boolean {
 }
 triggerRegistry.set('isPlayerStrong', isPlayerStrong);
 
+function always(): boolean {
+  return true;
+}
+triggerRegistry.set('always', always);
+
 export function getTrigger(id: string): TriggerFunction | undefined {
   return triggerRegistry.get(id);
 }

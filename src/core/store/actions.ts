@@ -82,6 +82,10 @@ export interface UpdateNpcsAction extends Action {
   };
 }
 
+export interface ShiftEventFromQueueAction extends Action {
+  type: 'SHIFT_EVENT_FROM_QUEUE';
+}
+
 export type GameAction =
   | InitGameStateAction
   | ApplyEventResultAction
@@ -92,7 +96,8 @@ export type GameAction =
   | AddTriggeredOnceEventAction
   | AddEventToQueueAction
   | UpdateNpcsAction
-  | UpdateInventoryAction;
+  | UpdateInventoryAction
+  | ShiftEventFromQueueAction;
 
 export interface UpdateInventoryAction extends Action {
   type: 'UPDATE_INVENTORY';

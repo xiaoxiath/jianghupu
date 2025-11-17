@@ -8,8 +8,7 @@
 import type { PlayerState } from '../core/player';
 import type { World, Location } from '../core/world';
 import { AICoreService } from '../core/ai/AICoreService';
-import { singleton } from 'tsyringe';
-import { container } from 'tsyringe';
+import { singleton, inject } from 'tsyringe';
 import { PromptManager } from './promptManager.js';
 
 // --- Type Definitions ---
@@ -48,7 +47,7 @@ export interface BardPrompt {
 /**
  * 说书人模型返回的结构。
  */
-import type { EventChoice, EventResult } from '../core/eventEngine';
+import type { EventChoice, EventResult } from '../core/events/types.js';
 
 export interface BardOutput {
   narration: string;
@@ -98,10 +97,11 @@ const STYLE_INSTRUCTIONS = {
 };
 
 // --- API Interaction ---
+@singleton()
 export class AIBard {
   constructor(
-    private aiService: AICoreService,
-    private promptManager: PromptManager
+    @inject(AICoreService) private aiService: AICoreService,
+    @inject(PromptManager) private promptManager: PromptManager
   ) {}
 
   /**
@@ -281,10 +281,4 @@ export class AIBard {
       };
     }
   }
-}
-
-// Legacy export for backward compatibility, to be removed later
-export async function generateNarration(promptData: BardPrompt): Promise<BardOutput> {
-  const bard = container.resolve(AIBard);
-  return bard.generateNarration(promptData);
 }

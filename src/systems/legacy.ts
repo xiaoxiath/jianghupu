@@ -1,4 +1,3 @@
-import { container } from 'tsyringe';
 import { TimeSystem } from './timeSystem.js';
 import { GameStore } from '../core/store/store.js';
 import { renderer } from '../ui/renderer.js';
@@ -8,9 +7,7 @@ import { prisma as db } from '../core/db.js';
 /**
  * 处理角色死亡和传承
  */
-export async function handleLegacy() {
-  const store = container.resolve(GameStore);
-  const timeSystem = container.resolve(TimeSystem);
+export async function handleLegacy(store: GameStore, timeSystem: TimeSystem) {
   const oldPlayer = store.getState().player;
   renderer.system(`${oldPlayer.name} 的一生结束了。`);
 

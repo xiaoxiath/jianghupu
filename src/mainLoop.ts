@@ -4,9 +4,10 @@ import type { GameState } from './core/state.js';
 import { handleCommand, sceneNeedsUpdate } from './ui/commands.js';
 import { SceneManager } from './narrator/sceneManager.js';
 import { GameStore } from './core/store/store.js';
-import { EventEngine, type EventChoice } from './core/eventEngine.js';
+import { EventEngine } from './core/eventEngine.js';
+import type { EventChoice } from './core/events/types.js';
+import { TimeSystem } from './systems/timeSystem.js';
 import { startCombat } from './systems/combat.js';
-import { container } from 'tsyringe';
 import { createBandit } from './core/npc.js';
 import { handleLegacy } from './systems/legacy.js';
 import { updateNpcEngine } from './core/npcEngine.js';
@@ -18,19 +19,20 @@ const INPUT_COMMAND_CHOICE = '输入指令 (save/load/exit)';
 /**
  * 游戏主循环 - 由 AI 说书人驱动
  */
-export async function mainLoop() {
+export async function mainLoop(
+  sceneManager: SceneManager,
+  eventEngine: EventEngine,
+  store: GameStore,
+  timeSystem: TimeSystem,
+) {
   renderer.system('游戏开始...');
-
-  const sceneManager = container.resolve(SceneManager);
-  const eventEngine = container.resolve(EventEngine);
-  const store = container.resolve(GameStore);
   
   // 检查是否有历史传承
   const legacyEvents = await db.eventLog.findMany({
     where: { type: 'LEGACY' },
     orderBy: { createdAt: 'desc' },
   });
-  const legacySummary = legacyEvents.map(e => JSON.parse(e.details).story).join(' ');
+  const legacySummary = legacyEvents.map((e: { details: string; }) => JSON.parse(e.details).story).join(' ');
 
   let nextSceneSummary = '游戏开始，你发现自己站在一个未知的江湖世界中。';
   let lastPlayerChoice = '';
@@ -40,17 +42,18 @@ export async function mainLoop() {
     loopCount++;
     console.log('\n' + '---'.repeat(20));
 
-    let gameState = store.getState();
+    let gameState = store.state;
 
     // 1. 活态世界演化
     // TODO: 这些应该成为 action
-    updateNpcEngine();
-    const factionContext = await evolveFactions();
+    updateNpcEngine(store);
+    const factionContext = await evolveFactions(timeSystem);
 
     // 2. 检查事件队列或触发随机事件
     let event = null;
     if (gameState.eventQueue.length > 0) {
-      event = gameState.eventQueue.shift()!;
+      event = gameState.eventQueue[0];
+      store.dispatch({ type: 'SHIFT_EVENT_FROM_QUEUE' });
     } else {
       event = await eventEngine.triggerRandomEvent(gameState);
     }
@@ -64,9 +67,9 @@ export async function mainLoop() {
       // 如果是战斗事件，则直接进入战斗
       if (event.type === '战斗') {
         const enemy = createBandit();
-        const combatResult = await startCombat(enemy);
+        const combatResult = await startCombat(enemy, store);
         if (combatResult === 'lose') {
-          await handleLegacy();
+          await handleLegacy(store, timeSystem);
           lastPlayerChoice = '你在死亡的边缘重生，开始了新的轮回。';
           continue;
         }
@@ -101,7 +104,7 @@ export async function mainLoop() {
     // 5. 处理玩家选择
     if (selection === INPUT_COMMAND_CHOICE) {
       const command = await cli.input('> ');
-      await handleCommand(command);
+      await handleCommand(command, store, eventEngine);
       if (command.trim().toLowerCase() === 'exit') {
           renderer.system('江湖再见！');
           return;
@@ -128,14 +131,7 @@ export async function mainLoop() {
         } else {
           // 标准动作，应用结果并让下一次循环生成新场景
           if (choice.result) {
-            const { player } = gameState;
-            if (choice.result.player_stats) {
-              player.stats.hp = Math.max(0, Math.min(player.stats.maxHp, player.stats.hp + (choice.result.player_stats.hp || 0)));
-              player.stats.mp = Math.max(0, Math.min(player.stats.maxMp, player.stats.mp + (choice.result.player_stats.mp || 0)));
-            }
-            if (choice.result.player_mood) {
-              player.mood = choice.result.player_mood;
-            }
+            store.dispatch({ type: 'APPLY_EVENT_RESULT', payload: { result: choice.result } });
             lastPlayerChoice = choice.result.description;
           } else {
             lastPlayerChoice = choice.text;

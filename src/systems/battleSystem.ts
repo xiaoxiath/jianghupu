@@ -58,6 +58,7 @@ export interface BattleResult {
  * 一个简单的、基于回合制的战斗系统实现。
  * (当前为占位符实现)
  */
+@singleton()
 export class BattleSystem implements IBattleSystem {
   private player: IBattler | null = null;
   private enemy: IBattler | null = null;

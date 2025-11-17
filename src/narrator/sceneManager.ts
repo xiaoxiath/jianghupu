@@ -7,11 +7,10 @@
 import type { GameState } from '../core/state';
 import { AIBard, type BardPrompt, type BardOutput } from './aiBard';
 import type { Location } from '../core/world';
-import type { GameEvent, EventChoice } from '../core/eventEngine';
+import type { GameEvent, EventChoice } from '../core/events/types.js';
 import { renderChoices } from '../ui/renderer';
 import { TimeSystem } from '../systems/timeSystem';
 import { createNpc, type NpcType } from '../core/npc';
-import { container } from 'tsyringe';
 import { GameStore } from '../core/store/store.js';
 
 type NarrativeTone = '宿命' | '诙谐' | '哲理' | '疯癫';
@@ -19,12 +18,16 @@ type NarrativeTone = '宿命' | '诙谐' | '哲理' | '疯癫';
 /**
  * 场景管理器，负责驱动 AI 叙事流程
  */
+import { singleton, inject } from 'tsyringe';
+
+@singleton()
 export class SceneManager {
   private currentTone: NarrativeTone = '宿命';
 
   constructor(
-    private bard: AIBard,
-    private timeSystem: TimeSystem,
+    @inject(AIBard) private bard: AIBard,
+    @inject(TimeSystem) private timeSystem: TimeSystem,
+    @inject(GameStore) private store: GameStore,
   ) {}
 
   /**
@@ -36,7 +39,7 @@ export class SceneManager {
     const { player, world } = gameState;
     
     // 0. 清理上一场景的临时 NPC
-    gameState.sceneNpcs = [];
+    this.store.dispatch({ type: 'UPDATE_SCENE_NPCS', payload: { npcs: [] } });
 
     // 1. 调用天机老人，看是否触发事件
     const eventDescription = await this.triggerStoryEngine(gameState);
@@ -148,7 +151,7 @@ export class SceneManager {
         if (result.event.type === 'npc' && result.event.data?.npc_type) {
           const npcType = result.event.data.npc_type as NpcType;
           const newNpc = createNpc(npcType, gameState.world.currentLocationId);
-          gameState.sceneNpcs.push(newNpc);
+          this.store.dispatch({ type: 'UPDATE_SCENE_NPCS', payload: { npcs: [...gameState.sceneNpcs, newNpc] } });
           console.log(`Created and added scene NPC: ${newNpc.name}`);
         }
 
@@ -244,15 +247,14 @@ export class SceneManager {
       };
     }
     
-    const store = container.resolve(GameStore);
-    const player = store.getState().player;
+    const player = this.store.state.player;
     const newInventory = player.inventory.map((item: any) => { // TODO: Use a proper item type
       if (item.name === itemToIdentify.name) {
         return { ...item, ...identificationInfo.identification };
       }
       return item;
     });
-    store.dispatch({ type: 'UPDATE_INVENTORY', payload: { inventory: newInventory } });
+    this.store.dispatch({ type: 'UPDATE_INVENTORY', payload: { inventory: newInventory } });
 
     return {
       narration: identificationInfo.dialogue,

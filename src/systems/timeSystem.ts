@@ -33,11 +33,12 @@ export interface TimeState {
 /**
  * 时间系统类，负责管理游戏时间的流逝和格式化。
  */
+@singleton()
 export class TimeSystem {
   private time: TimeState;
 
-  constructor(initialTime?: TimeState) {
-    this.time = initialTime || {
+  constructor() {
+    this.time = {
       year: 1, // 从第一年开始
       month: 1,
       day: 1,

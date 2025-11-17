@@ -8,7 +8,6 @@
     "resolveJsonModule": true,
     "moduleDetection": "force",
     "isolatedModules": true,
-    "verbatimModuleSyntax": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
 
@@ -18,8 +17,8 @@
     "noImplicitAny": true,
 
     /* If NOT transpiling with TypeScript */
-    "moduleResolution": "Bundler",
-    "module": "ES2022",
+    "moduleResolution": "Node",
+    "module": "ESNext",
     "noEmit": true,
 
     /* If your project is a library */

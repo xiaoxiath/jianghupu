@@ -1,117 +1,95 @@
+import { produce } from 'immer';
 import { getExpForNextLevel, levelUp } from '../../systems/cultivation';
 import type { GameState } from '../state';
 import type { Location } from '../world';
 import type { GameAction } from './actions';
-/**
- * 游戏状态的 Reducer 函数。
- * 接收当前状态和 Action，返回一个新的状态。
- * @param state - 当前游戏状态
- * @param action - 要处理的 Action
- * @returns 新的游戏状态
- */
-export function gameReducer(state: GameState, action: GameAction): GameState {
+
+export const gameReducer = produce((draft: GameState, action: GameAction): GameState | void => {
   switch (action.type) {
     case 'INIT_GAME_STATE':
+      // Immer can't work with an uninitialized state, so we must return the new state directly.
       return action.payload.initialState;
 
-    case 'APPLY_EVENT_RESULT':
+    case 'APPLY_EVENT_RESULT': {
       const { result } = action.payload;
-      const newPlayerState = { ...state.player };
+      const player = draft.player;
 
       if (result.player_stats) {
-        newPlayerState.stats = { ...newPlayerState.stats };
         if (result.player_stats.hp) {
-          newPlayerState.stats.hp = Math.min(newPlayerState.stats.maxHp, newPlayerState.stats.hp + result.player_stats.hp);
+          player.stats.hp = Math.min(player.stats.maxHp, player.stats.hp + result.player_stats.hp);
         }
         if (result.player_stats.mp) {
-          newPlayerState.stats.mp = Math.min(newPlayerState.stats.maxMp, newPlayerState.stats.mp + result.player_stats.mp);
+          player.stats.mp = Math.min(player.stats.maxMp, player.stats.mp + result.player_stats.mp);
         }
       }
 
       if (result.player_attributes) {
-        newPlayerState.attributes = { ...newPlayerState.attributes };
-        if (result.player_attributes.strength) newPlayerState.attributes.strength += result.player_attributes.strength;
-        if (result.player_attributes.constitution) newPlayerState.attributes.constitution += result.player_attributes.constitution;
-        if (result.player_attributes.intelligence) newPlayerState.attributes.intelligence += result.player_attributes.intelligence;
-        if (result.player_attributes.agility) newPlayerState.attributes.agility += result.player_attributes.agility;
+        if (result.player_attributes.strength) player.attributes.strength += result.player_attributes.strength;
+        if (result.player_attributes.constitution) player.attributes.constitution += result.player_attributes.constitution;
+        if (result.player_attributes.intelligence) player.attributes.intelligence += result.player_attributes.intelligence;
+        if (result.player_attributes.agility) player.attributes.agility += result.player_attributes.agility;
       }
 
       if (result.player_mood) {
-        newPlayerState.mood = result.player_mood;
+        player.mood = result.player_mood;
       }
+      break;
+    }
 
-      return {
-        ...state,
-        player: newPlayerState,
-      };
-
-    case 'DESERIALIZE':
+    case 'DESERIALIZE': {
       const loadedState = action.payload.state;
       const locationsMap = new Map<number, Location>(loadedState.world.locations);
-      return {
-        ...state,
-        player: loadedState.player,
-        world: {
-          ...loadedState.world,
-          locations: locationsMap,
-        },
-        time: loadedState.time,
-        triggeredOnceEvents: new Set(loadedState.triggeredOnceEvents || []),
+      
+      draft.player = loadedState.player;
+      draft.world = {
+        ...loadedState.world,
+        locations: locationsMap,
       };
+      draft.time = loadedState.time;
+      draft.triggeredOnceEvents = new Set(loadedState.triggeredOnceEvents || []);
+      break;
+    }
 
     case 'SET_PLAYER':
-      return {
-        ...state,
-        player: action.payload.player,
-      };
+      draft.player = action.payload.player;
+      break;
 
     case 'ADD_EXP': {
-      const newPlayer = { ...state.player };
-      newPlayer.xp += action.payload.exp;
+      draft.player.xp += action.payload.exp;
       
-      const requiredExp = getExpForNextLevel(newPlayer.level);
-      if (newPlayer.xp >= requiredExp) {
-        return levelUp(state);
+      const requiredExp = getExpForNextLevel(draft.player.level);
+      if (draft.player.xp >= requiredExp) {
+        levelUp(draft.player);
       }
-
-      return { ...state, player: newPlayer };
+      break;
     }
 
-    case 'LEVEL_UP': {
-      return levelUp(state);
-    }
+    case 'LEVEL_UP':
+      levelUp(draft.player);
+      break;
 
     case 'ADD_TRIGGERED_ONCE_EVENT':
-      return {
-        ...state,
-        triggeredOnceEvents: new Set(state.triggeredOnceEvents).add(action.payload.eventId),
-      };
+      draft.triggeredOnceEvents.add(action.payload.eventId);
+      break;
 
     case 'ADD_EVENT_TO_QUEUE':
-      return {
-        ...state,
-        eventQueue: [...state.eventQueue, action.payload.event],
-      };
+      draft.eventQueue.push(action.payload.event);
+      break;
+
+    case 'SHIFT_EVENT_FROM_QUEUE':
+      draft.eventQueue.shift();
+      break;
 
     case 'UPDATE_NPCS':
-      return {
-        ...state,
-        world: {
-          ...state.world,
-          npcs: action.payload.npcs,
-        },
-      };
+      draft.world.npcs = action.payload.npcs;
+      break;
 
     case 'UPDATE_INVENTORY':
-      return {
-        ...state,
-        player: {
-          ...state.player,
-          inventory: action.payload.inventory,
-        },
-      };
+      draft.player.inventory = action.payload.inventory;
+      break;
 
     default:
-      return state;
+      // For unhandled actions, we do nothing. Immer will return the original state.
+      break;
   }
-}
+});

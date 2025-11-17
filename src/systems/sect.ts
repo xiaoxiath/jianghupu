@@ -1,4 +1,3 @@
-import { container } from 'tsyringe';
 import { prisma as db } from '../core/db';
 import { logger } from '../utils/logger';
 import { TimeSystem } from './timeSystem.js';
@@ -13,7 +12,7 @@ export type RelationshipStatus = typeof RelationshipStatuses[number];
  * 演化所有门派和它们之间的关系。
  * 这个函数应该由时间系统定期调用（例如，每“旬”或每“月”）。
  */
-export async function evolveFactions(): Promise<string> {
+export async function evolveFactions(timeSystem: TimeSystem): Promise<string> {
   logger.info('开始演化门派势力...');
   const events: string[] = [];
 
@@ -29,7 +28,7 @@ export async function evolveFactions(): Promise<string> {
   }
 
   // 3. 检查是否触发门派间的重大事件（如战争）
-  const majorEvents = await checkForMajorFactionEvents();
+  const majorEvents = await checkForMajorFactionEvents(timeSystem);
   events.push(...majorEvents);
 
   logger.info('门派势力演化完成。');
@@ -99,9 +98,9 @@ async function updateFactionRelationships(factionId: number) {
 /**
  * 检查是否触发了门派间的重大事件，如战争、结盟等。
  */
-async function checkForMajorFactionEvents(): Promise<string[]> {
-    const events: string[] = [];
-    const hostileThreshold = 100; // 敌对度达到100则宣战
+async function checkForMajorFactionEvents(timeSystem: TimeSystem): Promise<string[]> {
+  const events: string[] = [];
+  const hostileThreshold = 100; // 敌对度达到100则宣战
     const relationships = await db.factionRelationship.findMany({
         where: {
             status: 'HOSTILE',
@@ -121,7 +120,6 @@ async function checkForMajorFactionEvents(): Promise<string[]> {
         });
 
         if (!existingEvent) {
-            const timeSystem = container.resolve(TimeSystem);
             const reason = `双方敌对关系达到顶点，${rel.source.name} 对 ${rel.target.name} 宣战！`;
             const details = {
                 faction1: rel.source.name,

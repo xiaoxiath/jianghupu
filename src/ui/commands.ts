@@ -1,10 +1,9 @@
-import { serializeGameState, deserializeGameState } from '../core/state.js';
+import { serializeGameState, deserializeGameState } from '../core/initialization.js';
 import { writeSaveGame, readSaveGame, saveFileExists } from '../utils/fileStore.js';
 import { archiveWorldState } from '../core/archive.js';
-import { container } from 'tsyringe';
 import { GameStore } from '../core/store/store.js';
 import { renderer } from './renderer.js';
-import { triggerDynamicEvent } from '../core/eventEngine.js';
+import type { EventEngine } from '../core/eventEngine.js';
 
 // 假设有一个全局的方式来控制游戏循环，比如一个事件发射器或回调
 // 这里我们用一个简单的标志来示意是否需要重新渲染场景
@@ -34,20 +33,20 @@ function renderMessage(message: string, type: MessageType = 'info') {
  * @param command - 玩家输入的完整命令字符串。
  * @returns Promise<void>
  */
-export async function handleCommand(command: string): Promise<void> {
+export async function handleCommand(command: string, store: GameStore, eventEngine: EventEngine): Promise<void> {
   // 重置场景更新标志
   sceneNeedsUpdate = false;
   const [action, ...args] = command.toLowerCase().split(' ');
 
   switch (action) {
     case 'save':
-      await handleSaveCommand(args);
+      await handleSaveCommand(args, store);
       break;
     case 'load':
-      await handleLoadCommand(args);
+      await handleLoadCommand(args, store);
       break;
     case 'dev:trigger_ai_event':
-        await triggerDynamicEvent();
+        await eventEngine.triggerDynamicEvent(store.state);
         renderMessage('正在尝试触发 AI 动态事件...', 'info');
         break;
     // 在这里可以添加更多的命令，如 'look', 'go', 'attack'
@@ -61,7 +60,7 @@ export async function handleCommand(command: string): Promise<void> {
  * 处理 "save" 命令。
  * @param args - 命令参数，期望第一个参数是存档槽位。
  */
-async function handleSaveCommand(args: string[]): Promise<void> {
+async function handleSaveCommand(args: string[], store: GameStore): Promise<void> {
   if (!args[0]) {
     renderMessage('需要指定存档槽位。请输入 "save [槽位号]"，例如: "save 1"', 'warning');
     return;
@@ -74,8 +73,7 @@ async function handleSaveCommand(args: string[]): Promise<void> {
 
   try {
     renderMessage(`正在保存至槽位 ${slot}...`, 'info');
-    const store = container.resolve(GameStore);
-    const state = store.getState();
+    const state = store.state;
     const serializableState = serializeGameState(state);
     await writeSaveGame(slot, serializableState);
     renderMessage(`游戏快照已成功保存至槽位 ${slot}。`, 'success');
@@ -93,7 +91,7 @@ async function handleSaveCommand(args: string[]): Promise<void> {
  * 处理 "load" 命令。
  * @param args - 命令参数，期望第一个参数是存档槽位。
  */
-async function handleLoadCommand(args: string[]): Promise<void> {
+async function handleLoadCommand(args: string[], store: GameStore): Promise<void> {
   if (!args[0]) {
     renderMessage('需要指定存档槽位。请输入 "load [槽位号]"，例如: "load 1"', 'warning');
     return;
@@ -112,7 +110,7 @@ async function handleLoadCommand(args: string[]): Promise<void> {
   try {
     renderMessage(`正在从槽位 ${slot} 加载...`, 'info');
     const state = await readSaveGame(slot);
-    deserializeGameState(state);
+    deserializeGameState(state, store);
     renderMessage(`游戏已成功从槽位 ${slot} 加载。`, 'success');
     
     // 设置标志，通知主循环需要重新渲染整个场景

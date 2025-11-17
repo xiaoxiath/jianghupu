@@ -7,6 +7,8 @@ import { logger } from '../utils/logger.js';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { prisma as db } from './db.js';
+import { singleton, container } from 'tsyringe';
+import { TriggerRegistry, type TriggerFunction } from './events/TriggerRegistry.js';
 
 const MODS_DIR = path.join(process.cwd(), 'mods');
 
@@ -17,6 +19,7 @@ interface ModManifest {
   version: string;
   description?: string;
   loadPriority?: number;
+  entry?: string; // e.g., "index.js"
 }
 
 interface Mod {
@@ -24,18 +27,11 @@ interface Mod {
   path: string;
 }
 
-class ModLoader {
-  private static instance: ModLoader;
+@singleton()
+export class ModLoader {
   private mods: Mod[] = [];
 
-  private constructor() {}
-
-  public static getInstance(): ModLoader {
-    if (!ModLoader.instance) {
-      ModLoader.instance = new ModLoader();
-    }
-    return ModLoader.instance;
-  }
+  constructor() {}
 
   /**
    * Scans the mods directory and loads valid mods.
@@ -53,6 +49,9 @@ class ModLoader {
             const manifest = JSON.parse(manifestContent) as ModManifest;
             this.mods.push({ manifest, path: modPath });
             logger.info(`Loaded mod: ${manifest.name} (v${manifest.version})`);
+
+            await this.loadModAssets(modPath, manifest);
+
           } catch (error) {
             logger.warn(`Could not load mod in ${dirent.name}. Invalid or missing manifest.json.`);
           }
@@ -65,6 +64,33 @@ class ModLoader {
         logger.info('No mods directory found. Skipping mod loading.');
       } else {
         logger.error('Error scanning for mods:', error);
+      }
+    }
+  }
+
+  private async loadModAssets(modPath: string, manifest: ModManifest): Promise<void> {
+    const entryFile = manifest.entry || 'index.js';
+    const entryPath = path.join(modPath, entryFile);
+
+    try {
+      await fs.access(entryPath);
+      const modModule = await import(entryPath);
+
+      // Load triggers
+      if (modModule.triggers && typeof modModule.triggers === 'object') {
+        for (const [id, func] of Object.entries(modModule.triggers)) {
+          if (typeof func === 'function') {
+            container.resolve(TriggerRegistry).register(id, func as TriggerFunction);
+            logger.info(`Registered trigger "${id}" from mod "${manifest.name}".`);
+          }
+        }
+      }
+
+      // Future: Load other assets like custom actions, components, etc.
+
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        logger.error(`Error loading assets from entry file for mod ${manifest.name}:`, error);
       }
     }
   }
@@ -147,5 +173,3 @@ class ModLoader {
     logger.info('All mod seeders executed.');
   }
 }
-
-export const modLoader = ModLoader.getInstance();

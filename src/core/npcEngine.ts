@@ -1,4 +1,3 @@
-import { container } from 'tsyringe';
 import { GameStore } from './store/store.js';
 import { renderer } from '../ui/renderer.js';
 
@@ -6,9 +5,8 @@ import { renderer } from '../ui/renderer.js';
  * 更新所有 NPC 的状态
  * 这是活态世界引擎的核心部分
  */
-export function updateNpcEngine() {
-  const store = container.resolve(GameStore);
-  const npcs = store.getState().world.npcs;
+export function updateNpcEngine(store: GameStore) {
+  const npcs = store.state.world.npcs;
 
   const updatedNpcs = npcs.map(npc => {
     if (npc.alive) {
@@ -26,5 +24,5 @@ export function updateNpcEngine() {
     return npc;
   });
 
-  store.dispatch({ type: 'UPDATE_NPCS', payload: { npcs: updatedNpcs } });
+  store.dispatch({ type: 'UPDATE_NPCS', payload: { npcs: updatedNpcs } } as any); // TODO: Add this to the store actions
 }

@@ -34,6 +34,7 @@ interface PromptTemplateConfig {
   outputFormat: string;
 }
 
+@singleton()
 export class PromptManager {
   private templates: Record<string, string> = {};
   private promptConfig: Record<PromptRole, PromptTemplateConfig> = {
