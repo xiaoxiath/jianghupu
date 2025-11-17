@@ -12,6 +12,7 @@ import { renderChoices } from '../ui/renderer';
 import { TimeSystem } from '../systems/timeSystem';
 import { createNpc, type NpcType } from '../core/npc';
 import { GameStore } from '../core/store/store.js';
+import { Item } from '../core/item';
 
 type NarrativeTone = '宿命' | '诙谐' | '哲理' | '疯癫';
 
@@ -248,7 +249,7 @@ export class SceneManager {
     }
     
     const player = this.store.state.player;
-    const newInventory = player.inventory.map((item: any) => { // TODO: Use a proper item type
+    const newInventory = player.inventory.map((item: Item) => {
       if (item.name === itemToIdentify.name) {
         return { ...item, ...identificationInfo.identification };
       }

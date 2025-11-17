@@ -43,12 +43,20 @@ export class EventEngine {
       
       const trigger = this.triggerRegistry.get(triggerConfig.id);
 
-      if (!trigger) {
-        console.warn(`[EventEngine] Trigger function "${triggerConfig.id}" not found for event "${data.title}". Event will never trigger.`);
-        triggerFn = () => false;
-      } else {
+      if (trigger) {
         // Pass the whole trigger config object to the trigger function
-        triggerFn = (state, helpers) => trigger(state, triggerConfig);
+        triggerFn = (state, helpers) => trigger(state, triggerConfig, helpers);
+      } else {
+        // If trigger not found by ID, assume the ID is an expression and use the expression trigger
+        const expressionTrigger = this.triggerRegistry.get('expression');
+        if (expressionTrigger) {
+          // The config for the expression trigger is an object with the expression string
+          const expressionConfig = { expression: triggerConfig.id };
+          triggerFn = (state, helpers) => expressionTrigger(state, expressionConfig, helpers);
+        } else {
+          console.warn(`[EventEngine] Trigger function "${triggerConfig.id}" not found for event "${data.title}", and expression trigger is not registered. Event will never trigger.`);
+          triggerFn = () => false;
+        }
       }
 
       return {

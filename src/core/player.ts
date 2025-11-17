@@ -1,3 +1,5 @@
+import type { Item } from './item';
+
 /**
  * 玩家的基础属性
  */
@@ -36,7 +38,7 @@ export interface PlayerState {
   alignment: '正' | '邪' | '中立';
   mood: string; // 心境
   triggeredOnceEvents: string[]; // 已经触发过的 once 事件 ID
-  inventory: any[]; // 物品栏
+  inventory: Item[]; // 物品栏
 }
 
 /**

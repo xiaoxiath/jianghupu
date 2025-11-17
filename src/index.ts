@@ -29,7 +29,7 @@ async function start() {
   container.registerSingleton(TriggerRegistry);
   container.registerSingleton(ModLoader);
   container.registerSingleton(EventEngine);
-  container.registerSingleton(GameStore);
+  // container.registerSingleton(GameStore);
   container.registerSingleton(AIBard);
   container.registerSingleton(SceneManager);
   container.registerSingleton(PromptManager);
@@ -39,8 +39,10 @@ async function start() {
   // Resolve all necessary instances from the container
   const eventEngine = container.resolve(EventEngine);
   const modLoader = container.resolve(ModLoader);
-  const store = container.resolve(GameStore);
   const timeSystem = container.resolve(TimeSystem);
+  const bard = container.resolve(AIBard);
+  const store = new GameStore(bard, timeSystem);
+  container.registerInstance(GameStore, store);
   const sceneManager = container.resolve(SceneManager);
 
   logger.info('Initializing game state...');

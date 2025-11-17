@@ -1,7 +1,9 @@
 import type { GameState, SerializableGameState } from '../state';
 import type { Npc } from '../npc';
-import type { EventResult } from '../eventEngine';
+import type { EventResult } from '../events/types';
 import type { PlayerState as Player } from '../player';
+import type { Item } from '../item';
+import { GameEvent } from '../events/types';
 
 /**
  * Action 基类
@@ -71,7 +73,7 @@ export interface AddTriggeredOnceEventAction extends Action {
 export interface AddEventToQueueAction extends Action {
   type: 'ADD_EVENT_TO_QUEUE';
   payload: {
-    event: any; // TODO: Define a proper type for events
+    event: GameEvent;
   };
 }
 
@@ -102,6 +104,6 @@ export type GameAction =
 export interface UpdateInventoryAction extends Action {
   type: 'UPDATE_INVENTORY';
   payload: {
-    inventory: any[]; // TODO: Define a proper type for items
+    inventory: Item[];
   };
 }

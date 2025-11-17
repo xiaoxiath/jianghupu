@@ -1,5 +1,7 @@
 import { prisma } from './db';
+import type { NPC as PrismaNpc } from '@prisma/client';
 import type { GameState } from './state';
+import type { Npc } from './npc.js';
 import { logger } from '../utils/logger';
 
 /**
@@ -66,7 +68,7 @@ export async function loadWorldFromArchive(gameState: GameState): Promise<void> 
     }
 
     // 将数据库模型转换为游戏内的 Npc 对象
-    const npcs = dbNPCs.map(dbNpc => {
+    const npcs: Npc[] = dbNPCs.map((dbNpc: PrismaNpc): Npc => {
       const location = Array.from(gameState.world.locations.values()).find(loc => loc.name === dbNpc.location);
       return {
         id: dbNpc.id,
@@ -83,7 +85,7 @@ export async function loadWorldFromArchive(gameState: GameState): Promise<void> 
     });
 
     // 过滤掉那些地点无效的 NPC
-    gameState.world.npcs = npcs.filter(npc => {
+    gameState.world.npcs = npcs.filter((npc: Npc) => {
       if (npc.locationId === -1) {
         logger.warn(`Could not find location "${npc.name}" for NPC, removing from world.`);
         return false;

@@ -184,6 +184,25 @@ export class AIBard {
     }
   }
 
+  public async generateNpcGrowthNarrative(npc: any, oldStrength: number, newStrength: number): Promise<string | null> {
+    const templateData = {
+      npc,
+      old_strength: oldStrength,
+      new_strength: newStrength,
+    };
+    const fullPrompt = this.promptManager.buildPrompt('npc_growth', templateData);
+    const response = await this.aiService.generate({
+      prompt: fullPrompt,
+    });
+
+    if (!response.success || !response.content) {
+      console.error('NPC Growth AI failed to respond.');
+      return null;
+    }
+
+    return response.content;
+  }
+
   public async generateNarration(promptData: BardPrompt): Promise<BardOutput> {
     const templateData = {
       ...promptData.playerState,

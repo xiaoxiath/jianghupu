@@ -1,8 +1,12 @@
-import { singleton } from 'tsyringe';
+import { singleton, inject } from 'tsyringe';
 import { produce, type Draft } from 'immer';
 import { EventEmitter } from 'events';
 import type { EventResult, GameEvent } from '../events/types.js';
 import { type GameState, initialState, type SerializableGameState } from '../state.js';
+import { updateNpcEngine } from '../npcEngine.js';
+import { evolveFactions } from '../../systems/sect.js';
+import { AIBard } from '../../narrator/aiBard.js';
+import { TimeSystem } from '../../systems/timeSystem.js';
 
 type Action =
   | { type: 'SET_PLAYER_NAME', payload: { name: string } }
@@ -14,15 +18,23 @@ type Action =
   | { type: 'UPDATE_INVENTORY', payload: { inventory: any[] } }
   | { type: 'SHIFT_EVENT_FROM_QUEUE' }
   | { type: 'UPDATE_NPCS', payload: { npcs: any[] } }
-  | { type: 'UPDATE_SCENE_NPCS', payload: { npcs: any[] } };
+  | { type: 'UPDATE_SCENE_NPCS', payload: { npcs: any[] } }
+  | { type: 'WORLD_UPDATE' };
 
 @singleton()
 export class GameStore extends EventEmitter {
   private _state: GameState;
+  private bard: AIBard;
+  private timeSystem: TimeSystem;
 
-  constructor() {
+  constructor(
+    @inject(AIBard) bard: AIBard,
+    @inject(TimeSystem) timeSystem: TimeSystem
+  ) {
     super();
     this._state = initialState;
+    this.bard = bard;
+    this.timeSystem = timeSystem;
   }
 
   get state(): GameState {
@@ -30,7 +42,12 @@ export class GameStore extends EventEmitter {
   }
 
   // A simple reducer-like dispatch function
-  dispatch(action: Action): void {
+  public async dispatch(action: Action | Function): Promise<void> {
+    if (typeof action === 'function') {
+      await action(this.dispatch.bind(this), this.state);
+      return;
+    }
+
     const nextState = produce(this._state, (draft: Draft<GameState>) => {
       switch (action.type) {
         case 'SET_PLAYER_NAME':
@@ -77,6 +94,9 @@ export class GameStore extends EventEmitter {
         case 'UPDATE_SCENE_NPCS':
           draft.sceneNpcs = action.payload.npcs;
           break;
+        case 'WORLD_UPDATE':
+          // This is a placeholder, the actual logic is in the async action creator
+          break;
         default:
           break;
       }
@@ -86,5 +106,13 @@ export class GameStore extends EventEmitter {
       this._state = nextState;
       this.emit('change', this._state);
     }
+  }
+
+  public updateWorld() {
+    return async (dispatch: (action: Action) => void) => {
+      await updateNpcEngine(this, this.bard);
+      await evolveFactions(this.timeSystem);
+      dispatch({ type: 'WORLD_UPDATE' });
+    };
   }
 }

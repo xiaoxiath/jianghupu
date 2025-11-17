@@ -24,7 +24,7 @@ function renderTemplate(template: string, data: Record<string, any>): string {
   });
 }
 
-export type PromptRole = 'narrator' | 'story_engine' | 'trader' | 'skill_master' | 'item_master';
+export type PromptRole = 'narrator' | 'story_engine' | 'trader' | 'skill_master' | 'item_master' | 'npc_growth';
 
 interface PromptTemplateConfig {
   systemRole: string;
@@ -73,6 +73,13 @@ export class PromptManager {
       taskInstruction: 'item_master_task_instruction',
       outputFormat: 'item_master_output_format',
     },
+    npc_growth: {
+      systemRole: 'system_role',
+      worldContext: 'context_world',
+      playerContext: '',
+      taskInstruction: 'npc_growth_task_instruction',
+      outputFormat: 'output_format_raw_text',
+    }
   };
 
   constructor() {

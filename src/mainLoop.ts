@@ -45,9 +45,8 @@ export async function mainLoop(
     let gameState = store.state;
 
     // 1. 活态世界演化
-    // TODO: 这些应该成为 action
-    updateNpcEngine(store);
-    const factionContext = await evolveFactions(timeSystem);
+    await store.dispatch(store.updateWorld());
+    const factionContext = ''; // This will be handled within the world update now
 
     // 2. 检查事件队列或触发随机事件
     let event = null;
