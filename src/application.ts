@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import "reflect-metadata";
 import { container } from "tsyringe";
 import { enableMapSet } from 'immer';

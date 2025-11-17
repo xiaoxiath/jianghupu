@@ -8,7 +8,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const LOG_FILE = path.join(__dirname, '..', '..', '..', 'logs', 'ai_cost.log');
+const LOG_FILE = process.env.AI_COST_LOG_FILE || path.join(__dirname, '..', '..', '..', 'logs', 'ai_cost.log');
 
 export interface AICallRecord {
   timestamp: string;

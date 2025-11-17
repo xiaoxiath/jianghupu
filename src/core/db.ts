@@ -1,10 +1,9 @@
-import Prisma from '@prisma/client';
-const { PrismaClient } = Prisma;
+import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const DB_PATH = path.join(process.cwd(), 'data');
-const DB_FILE = path.join(DB_PATH, 'world.db');
+const DB_PATH = process.env.DB_PATH || path.join(process.cwd(), 'data');
+const DB_FILE = process.env.DB_FILE || path.join(DB_PATH, 'world.db');
 
 // 在初始化 Prisma Client 之前，确保存放数据库文件的目录存在
 if (!fs.existsSync(DB_PATH)) {

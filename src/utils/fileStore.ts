@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as zlib from 'zlib';
 import type { SerializableGameState } from '../core/state.js';
 
-const SAVE_DIR = path.join(process.cwd(), 'saves');
+const SAVE_DIR = process.env.SAVE_DIR || path.join(process.cwd(), 'saves');
 const TEMP_SUFFIX = '.tmp';
 
 /**
